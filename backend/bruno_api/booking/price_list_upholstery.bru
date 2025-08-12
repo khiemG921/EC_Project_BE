@@ -1,0 +1,18 @@
+meta {
+  name: price_list_upholstery
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{base_url}}/api/booking/price_list
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "service_id": 4,
+    "ids": [14, 15, 16, 17, 18]
+  }
+}

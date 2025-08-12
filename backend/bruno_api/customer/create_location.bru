@@ -1,0 +1,25 @@
+meta {
+  name: create_location
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/location/create
+  body: json
+  auth: inherit
+}
+
+headers {
+  x-user-id: 2
+}
+
+body:json {
+  {
+    "longtitude": 106.7243672,
+    "latitude": 10.7512909,
+    "city": "Hồ Chí Minh",
+    "district": "Quận 7",
+    "detail": "39b Nguyễn Văn Linh, Tân Thuận Tây, Quận 7, Hồ Chí Minh"
+  }
+}

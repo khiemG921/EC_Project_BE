@@ -1,0 +1,21 @@
+meta {
+  name: hourly_checkout
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{base_url}}/api/booking/hourly/checkout
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "staff_count": 1,
+    "cleaning_duration": 2,
+    "vacuum": true,
+    "cooking": true,
+    "laundry": false
+  }
+}

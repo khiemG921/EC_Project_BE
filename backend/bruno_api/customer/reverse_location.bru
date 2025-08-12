@@ -1,0 +1,22 @@
+meta {
+  name: reverse_location
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{base_url}}/api/location/reverse
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "lat": "20.981971",
+    "lng": "105.864323"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

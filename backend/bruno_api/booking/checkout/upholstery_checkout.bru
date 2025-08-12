@@ -1,0 +1,21 @@
+meta {
+  name: upholstery_checkout
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{base_url}}/api/booking/upholstery/checkout
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "selectedItems": {
+      "14": 2,
+      "15": 1,
+      "17": 3
+    }
+  }
+}

@@ -1,0 +1,15 @@
+meta {
+  name: service_details
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/services/details
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {"name": "Giúp Việc Ca Lẻ"}
+}

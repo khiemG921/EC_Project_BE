@@ -1,0 +1,23 @@
+meta {
+  name: periodic_checkou
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/api/booking/periodic/checkout
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "duration": 2,
+    "daysPerWeek": 2,
+    "months": 3,
+    "cooking": false,
+    "shopping": false,
+    "laundry": false,
+    "vacuum": true
+  }
+}
