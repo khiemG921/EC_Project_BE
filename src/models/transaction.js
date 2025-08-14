@@ -54,7 +54,7 @@ const Transaction = sequelize.define('Transaction', {
 Transaction.removeAttribute('id');
 
 // Set up associations
-Job.hasMany(Transaction, { foreignKey: 'job_id' });
+Job.hasOne(Transaction, { foreignKey: 'job_id' });
 Transaction.belongsTo(Job, { foreignKey: 'job_id' });
 
 module.exports = Transaction;

@@ -53,6 +53,11 @@ const Customer = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    // List of service_ids the user added to their watchlist (JSON array of strings)
+    watchlist_services: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
     tasker_application_status: {
       type: DataTypes.ENUM('none', 'pending', 'approved', 'rejected'),
       defaultValue: 'none',

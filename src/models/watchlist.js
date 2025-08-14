@@ -1,33 +1,31 @@
-module.exports = (sequelize, DataTypes) => {
-  const Watchlist = sequelize.define('Watchlist', {
-    id: {
-      type: DataTypes.INTEGER,
-      autoIncrement: true,
-      primaryKey: true
-    },
-    firebase_id: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    service_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false
-    },
-    created_at: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW
-    }
-  }, {
-    tableName: 'watchlist',
-    timestamps: false
-  });
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/db');
+const Service = require('./service');
 
-  Watchlist.associate = (models) => {
-    Watchlist.belongsTo(models.Service, {
-      foreignKey: 'service_id',
-      as: 'service'
-    });
-  };
+const Watchlist = sequelize.define('Watchlist', {
+  id: {
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
+    primaryKey: true
+  },
+  firebase_id: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  service_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  created_at: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  }
+}, {
+  tableName: 'watchlist',
+  timestamps: false
+});
 
-  return Watchlist;
-};
+// Associations
+Watchlist.belongsTo(Service, { foreignKey: 'service_id', as: 'service' });
+
+module.exports = Watchlist;

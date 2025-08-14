@@ -257,10 +257,12 @@ const verifyUserToken = async (req, res) => {
       email: customer.email
     });
 
-    // Xử lý role
-    let userRole = "customer";
-    if (typeof decodedToken.role === 'string') {
-      userRole = decodedToken.role;
+    // Xử lý roles: ưu tiên customClaims.roles (array), fallback role (string), mặc định ['customer']
+    let roles = ['customer'];
+    if (Array.isArray(decodedToken.roles)) {
+      roles = decodedToken.roles;
+    } else if (typeof decodedToken.role === 'string') {
+      roles = [decodedToken.role];
     }
 
     res.json({
@@ -270,7 +272,7 @@ const verifyUserToken = async (req, res) => {
         name: customer.name,
         email: customer.email,
         avatar: customer.avatar_url,
-        roles: [userRole],
+        roles,
         firebase_id: decodedToken.uid,
         phone: customer.phone,
         reward_points: customer.reward_points,

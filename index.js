@@ -11,10 +11,16 @@ const sequelize = require('./src/config/db');
 const app = express();
 
 // ============== MIDDLEWARES ==============
-app.use(cors({
-  origin: "http://localhost:3000",
-  credentials: true
-}));
+const corsOptions = {
+  origin: 'http://localhost:3000',
+  credentials: true,
+  methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
+
 app.use(express.json());
 app.use(cookieParser());
 
@@ -40,9 +46,10 @@ const profileRoutes = require('./src/routes/profile.routes.js');
 const favoriteRoutes = require('./src/routes/favourite.routes.js');
 const paymentRoutes = require('./src/routes/payment.routes.js');
 const jobRoutes = require('./src/routes/job.routes.js');
+const taskerJobsRoutes = require('./src/routes/tasker.jobs.routes.js');
 const transactionRoutes = require('./src/routes/transaction.routes.js');
 const servicesRoutes = require('./src/routes/services.js');
-const vouchersRoutes = require('./src/routes/vouchers.js');
+const vouchersRoutes = require('./src/routes/vouchers.routes.js');
 const priceListRoutes = require('./src/routes/price_list.routes.js');
 const reviewRoutes = require('./src/routes/review.routes.js');
 const watchlistRoutes = require('./src/routes/watchlistRoutes');
@@ -52,6 +59,7 @@ const crawlerRoutes = require('./src/routes/crawler.routes.js');
 const crawlerService = require('./src/services/crawler.service');
 const newsImportRoutes = require('./src/routes/newsImport.routes.js');
 
+const adminJobsRoutes = require('./src/routes/admin/admin.jobs.routes.js');
 const adminUserRoutes = require('./src/routes/admin/admin.users.routes.js');
 const adminVouchersRoutes = require('./src/routes/admin/admin.voucher.routes.js');
 const adminStatisticsRoutes = require('./src/routes/admin/admin.statistics.routes.js');
@@ -62,11 +70,11 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/favorite', favoriteRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/forgot-password', forgotPasswordRoutes);
+app.use('/api/tasker', taskerJobsRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/watchlist', watchlistRoutes);
 
 app.use('/api/', servicesRoutes);
-app.use('/api/', vouchersRoutes);
 app.use('/api/', checkoutRoutes);
 app.use('/api/', customerRoutes);
 app.use('/api/', locationRoutes);
@@ -75,11 +83,13 @@ app.use('/api/', paymentRoutes);
 app.use('/api/', jobRoutes);
 app.use('/api/', transactionRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/vouchers', vouchersRoutes);
 
 app.use('/api/tasker-applications', taskerApplicationRoutes);
 app.use('/api/crawler', crawlerRoutes);
 app.use('/api/news-import', newsImportRoutes);
 
+app.use('/api/admin/jobs', adminJobsRoutes);
 app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/admin/vouchers', adminVouchersRoutes);
 app.use('/api/admin/statistics', adminStatisticsRoutes);

@@ -30,6 +30,10 @@ const Tasker = sequelize.define(
             type: DataTypes.INTEGER,
             defaultValue: 0,
         },
+        worked_hours: {
+            type: DataTypes.INTEGER,
+            defaultValue: 0,
+        },
         rating: {
             type: DataTypes.FLOAT,
             defaultValue: 0,

@@ -3,7 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const favoriteController = require('../controllers/favorite.controller');
-const verifyToken = require('../middleware/auth.middle');
+const verifyToken = require('../middleware/auth.middle').verifyToken;
 
 // All favorite routes require authentication
 router.post('/add', verifyToken, favoriteController.addFavorite);

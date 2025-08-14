@@ -1,5 +1,5 @@
 const express = require('express');
-const verifySession = require('../middleware/auth.middle'); // hoặc verifyToken
+const verifySession = require('../middleware/auth.middle').verifyToken; // hoặc verifyToken
 const { createPaypalOrder, capturePaypalOrder, createMoMoOrder, createZaloPayOrder } = require('../controllers/payment.controller');
 
 const router = express.Router();
