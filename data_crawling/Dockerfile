@@ -6,6 +6,7 @@ RUN apt-get update \
        chromium \
        chromium-driver \
        python3 \
+       python3-venv \
        python3-pip \
        ca-certificates \
        fonts-liberation \
@@ -13,12 +14,19 @@ RUN apt-get update \
     && ln -sf /usr/bin/chromium /usr/bin/google-chrome \
     && rm -rf /var/lib/apt/lists/*
 
-# Python packages required by the crawler script
-RUN pip3 install --no-cache-dir \
+# Create a virtual environment for Python packages to avoid "externally-managed-environment" errors
+RUN python3 -m venv /opt/venv \
+    && /opt/venv/bin/python -m pip install --upgrade pip setuptools wheel
+
+# Install Python packages into the venv
+RUN /opt/venv/bin/pip install --no-cache-dir \
       pandas \
       requests \
       beautifulsoup4 \
       selenium
+
+# Put venv bin first in PATH so `python` and `pip` in runtime use the venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
 
