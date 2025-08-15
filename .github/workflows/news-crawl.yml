@@ -34,21 +34,21 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y jq
 
-      - name: Warm up backend (retry until 200)
-        run: |
-          set -e
-          echo "Warming up $BACKEND_BASE_URL/api/"
-          CODE=000
-          for i in $(seq 1 60); do
-            # short per-attempt timeout to avoid 30s edge timeout
-            CODE=$(curl -sS -m 8 --connect-timeout 5 -o /dev/null -w "%{http_code}" "$BACKEND_BASE_URL/api/") || CODE=000
-            echo "Attempt $i: /api/ -> $CODE"
-            if [ "$CODE" -eq 200 ]; then
-              echo "Backend is up"; break; fi
-            sleep 5
-          done
-          if [ "$CODE" -ne 200 ]; then
-            echo "Backend did not become ready (last code $CODE)" >&2; exit 1; fi
+      # - name: Warm up backend (retry until 200)
+      #   run: |
+      #     set -e
+      #     echo "Warming up $BACKEND_BASE_URL/api/"
+      #     CODE=000
+      #     for i in $(seq 1 60); do
+      #       # short per-attempt timeout to avoid 30s edge timeout
+      #       CODE=$(curl -sS -m 8 --connect-timeout 5 -o /dev/null -w "%{http_code}" "$BACKEND_BASE_URL/api/") || CODE=000
+      #       echo "Attempt $i: /api/ -> $CODE"
+      #       if [ "$CODE" -eq 200 ]; then
+      #         echo "Backend is up"; break; fi
+      #       sleep 5
+      #     done
+      #     if [ "$CODE" -ne 200 ]; then
+      #       echo "Backend did not become ready (last code $CODE)" >&2; exit 1; fi
 
       - name: Check crawler status (pre-run)
         run: |
