@@ -1,0 +1,42 @@
+name: News Crawl and Import
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Every Sunday 00:00 UTC
+  workflow_dispatch:
+    inputs:
+      maxTotal:
+        description: 'Max total rows to keep (prune oldest beyond this)'
+        required: false
+        default: '500'
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    env:
+      BACKEND_BASE_URL: ${{ secrets.BACKEND_BASE_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      MAX_TOTAL: ${{ github.event.inputs.maxTotal || '500' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trigger crawler run
+        run: |
+          set -e
+          if [ -z "$BACKEND_BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Missing BACKEND_BASE_URL or CRON_SECRET secrets" >&2
+            exit 1
+          fi
+          echo "Calling $BACKEND_BASE_URL/api/crawler/run"
+          curl -sS -X POST "$BACKEND_BASE_URL/api/crawler/run" -H "x-cron-key: $CRON_SECRET" -H "Accept: application/json"
+
+      - name: Import latest CSV into DB
+        run: |
+          set -e
+          MT=${MAX_TOTAL:-500}
+          echo "Importing with maxTotal=$MT"
+          curl -sS -X POST "$BACKEND_BASE_URL/api/news-import/import-latest" \
+            -H "x-cron-key: $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "{\"maxTotal\": $MT}"
