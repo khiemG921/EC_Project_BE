@@ -29,12 +29,62 @@ jobs:
           fi
           echo "Using backend: $BACKEND_BASE_URL"
 
+      - name: Install tools (jq)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+
+      - name: Warm up backend (retry until 200)
+        run: |
+          set -e
+          echo "Warming up $BACKEND_BASE_URL/api/"
+          for i in {1..20}; do
+            CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$BACKEND_BASE_URL/api/") || CODE=000
+            echo "Attempt $i: /api/ -> $CODE"
+            if [ "$CODE" -eq 200 ]; then
+              echo "Backend is up"; break; fi
+            sleep 5
+          done
+          if [ "$CODE" -ne 200 ]; then
+            echo "Backend did not become ready (last code $CODE)" >&2; exit 1; fi
+
+      - name: Check crawler status (pre-run)
+        run: |
+          set -e
+          curl -sS "$BACKEND_BASE_URL/api/crawler/status" -D /tmp/headers.txt -o /tmp/body.txt || true
+          echo "=== HEADERS ==="; cat /tmp/headers.txt || true
+          echo "=== BODY ==="; cat /tmp/body.txt || true
+
       - name: Trigger crawler run
         run: |
           set -e
           echo "Calling $BACKEND_BASE_URL/api/crawler/run"
+          # Retry on transient 5xx or network errors
           curl -sS -X POST "$BACKEND_BASE_URL/api/crawler/run" \
-            -H "x-cron-key: $CRON_SECRET" -H "Accept: application/json" -w "\nHTTP_CODE:%{http_code}\n" --fail || (echo "Crawler trigger failed" && exit 1)
+            -H "x-cron-key: $CRON_SECRET" -H "Accept: application/json" \
+            --retry 5 --retry-all-errors --retry-delay 5 \
+            -D /tmp/run_headers.txt -o /tmp/run_body.txt || true
+          echo "=== RUN HEADERS ==="; cat /tmp/run_headers.txt || true
+          echo "=== RUN BODY ==="; cat /tmp/run_body.txt || true
+          CODE=$(grep -Eo "HTTP/[0-9.]+ [0-9]+" /tmp/run_headers.txt | tail -n1 | awk '{print $2}')
+          echo "HTTP_CODE:$CODE"
+          if [ "$CODE" != "200" ] && [ "$CODE" != "202" ]; then
+            echo "Crawler trigger failed with $CODE" >&2; exit 1; fi
+
+      - name: Wait for crawler output (poll status)
+        run: |
+          set -e
+          echo "Polling crawler status for up to 5 minutes..."
+          for i in {1..30}; do
+            RESP=$(curl -sS "$BACKEND_BASE_URL/api/crawler/status") || true
+            echo "$RESP"
+            STATUS=$(echo "$RESP" | jq -r '.data.lastStatus // "unknown"')
+            FILES=$(echo "$RESP" | jq -r '.data.files | length')
+            echo "lastStatus=$STATUS files=$FILES"
+            if [ "$STATUS" = "success" ] || [ "$FILES" -gt 0 ]; then
+              echo "Crawler produced output"; break; fi
+            sleep 10
+          done
 
       - name: Import latest CSV into DB
         run: |
@@ -44,4 +94,12 @@ jobs:
           curl -sS -X POST "$BACKEND_BASE_URL/api/news-import/import-latest" \
             -H "x-cron-key: $CRON_SECRET" \
             -H "Content-Type: application/json" \
-            -d "{\"maxTotal\": $MT}" -w "\nHTTP_CODE:%{http_code}\n" --fail
+            -d "{\"maxTotal\": $MT}" \
+            --retry 5 --retry-all-errors --retry-delay 5 \
+            -D /tmp/import_headers.txt -o /tmp/import_body.txt || true
+          echo "=== IMPORT HEADERS ==="; cat /tmp/import_headers.txt || true
+          echo "=== IMPORT BODY ==="; cat /tmp/import_body.txt || true
+          CODE=$(grep -Eo "HTTP/[0-9.]+ [0-9]+" /tmp/import_headers.txt | tail -n1 | awk '{print $2}')
+          echo "HTTP_CODE:$CODE"
+          if [ "$CODE" -lt 200 ] || [ "$CODE" -ge 300 ]; then
+            echo "Import failed with $CODE" >&2; exit 1; fi
