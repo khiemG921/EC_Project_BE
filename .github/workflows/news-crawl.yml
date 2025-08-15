@@ -2,7 +2,7 @@ name: News Crawl and Import
 
 on:
   schedule:
-    - cron: '0 0 * * 0' # Every Sunday 00:00 UTC
+    - cron: '0 0 * * 0'
   workflow_dispatch:
     inputs:
       maxTotal:
@@ -21,15 +21,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate secrets
+        run: |
+          if [ -z "$BACKEND_BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Missing BACKEND_BASE_URL or CRON_SECRET" >&2
+            exit 1
+          fi
+          echo "Using backend: $BACKEND_BASE_URL"
+
       - name: Trigger crawler run
         run: |
           set -e
-          if [ -z "$BACKEND_BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
-            echo "Missing BACKEND_BASE_URL or CRON_SECRET secrets" >&2
-            exit 1
-          fi
           echo "Calling $BACKEND_BASE_URL/api/crawler/run"
-          curl -sS -X POST "$BACKEND_BASE_URL/api/crawler/run" -H "x-cron-key: $CRON_SECRET" -H "Accept: application/json"
+          curl -sS -X POST "$BACKEND_BASE_URL/api/crawler/run" \
+            -H "x-cron-key: $CRON_SECRET" -H "Accept: application/json" -w "\nHTTP_CODE:%{http_code}\n" --fail || (echo "Crawler trigger failed" && exit 1)
 
       - name: Import latest CSV into DB
         run: |
@@ -39,4 +44,4 @@ jobs:
           curl -sS -X POST "$BACKEND_BASE_URL/api/news-import/import-latest" \
             -H "x-cron-key: $CRON_SECRET" \
             -H "Content-Type: application/json" \
-            -d "{\"maxTotal\": $MT}"
+            -d "{\"maxTotal\": $MT}" -w "\nHTTP_CODE:%{http_code}\n" --fail
