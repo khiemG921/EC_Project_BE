@@ -13,8 +13,8 @@ let state = {
   lastRun: null,
   lastStatus: 'idle', // idle|running|success|error
   lastMessage: null,
-  pythonPath: 'python',
-  mode: 'notebook', // notebook|script
+  pythonPath: process.env.CRAWLER_PYTHON || 'python',
+  mode: process.env.CRAWLER_MODE === 'notebook' ? 'notebook' : 'script', // notebook|script
   notebookPath: path.resolve(__dirname, '../../../data_crawling/data_collection.ipynb'),
   scriptPath: path.resolve(__dirname, '../../../data_crawling/crawl_news.py'),
   outputDir: OUTPUT_DIR_DEFAULT,
@@ -112,8 +112,12 @@ async function runNow() {
       state.notebookPath
     );
   } else {
-    // Expect the script to accept an --out path argument
-    args.push(state.scriptPath, '--out', outCsv);
+    // Script mode: pass output path and limit to 10 items in headless mode by default
+    const maxItems = Number(process.env.CRAWLER_MAX_ITEMS || 10);
+    const maxPages = Number(process.env.CRAWLER_MAX_PAGES || 10);
+    const headlessFlag = (process.env.CRAWLER_HEADLESS || 'true').toLowerCase() !== 'false';
+    args.push(state.scriptPath, '--out', outCsv, '--max-items', String(maxItems), '--max-pages', String(maxPages));
+    if (headlessFlag) args.push('--headless');
   }
 
   return new Promise((resolve, reject) => {
