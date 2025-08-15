@@ -38,8 +38,10 @@ jobs:
         run: |
           set -e
           echo "Warming up $BACKEND_BASE_URL/api/"
-          for i in {1..20}; do
-            CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$BACKEND_BASE_URL/api/") || CODE=000
+          CODE=000
+          for i in $(seq 1 60); do
+            # short per-attempt timeout to avoid 30s edge timeout
+            CODE=$(curl -sS -m 8 --connect-timeout 5 -o /dev/null -w "%{http_code}" "$BACKEND_BASE_URL/api/") || CODE=000
             echo "Attempt $i: /api/ -> $CODE"
             if [ "$CODE" -eq 200 ]; then
               echo "Backend is up"; break; fi
@@ -62,7 +64,7 @@ jobs:
           # Retry on transient 5xx or network errors
           curl -sS -X POST "$BACKEND_BASE_URL/api/crawler/run" \
             -H "x-cron-key: $CRON_SECRET" -H "Accept: application/json" \
-            --retry 5 --retry-all-errors --retry-delay 5 \
+            --retry 8 --retry-all-errors --retry-delay 5 -m 15 --connect-timeout 5 \
             -D /tmp/run_headers.txt -o /tmp/run_body.txt || true
           echo "=== RUN HEADERS ==="; cat /tmp/run_headers.txt || true
           echo "=== RUN BODY ==="; cat /tmp/run_body.txt || true
@@ -95,7 +97,7 @@ jobs:
             -H "x-cron-key: $CRON_SECRET" \
             -H "Content-Type: application/json" \
             -d "{\"maxTotal\": $MT}" \
-            --retry 5 --retry-all-errors --retry-delay 5 \
+            --retry 8 --retry-all-errors --retry-delay 5 -m 15 --connect-timeout 5 \
             -D /tmp/import_headers.txt -o /tmp/import_body.txt || true
           echo "=== IMPORT HEADERS ==="; cat /tmp/import_headers.txt || true
           echo "=== IMPORT BODY ==="; cat /tmp/import_body.txt || true
