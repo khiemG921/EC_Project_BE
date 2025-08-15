@@ -24,8 +24,18 @@ exports.updateConfig = async (req, res) => {
 
 exports.runNow = async (req, res) => {
   try {
-    const result = await crawler.runNow();
-    return res.json({ success: true, data: result });
+    // If already running, inform caller
+    const status = crawler.getStatus();
+    if (status.lastStatus === 'running') {
+      return res.status(202).json({ success: true, message: 'Crawler is already running', data: { started: false } });
+    }
+
+    // Fire-and-forget to avoid HTTP timeout on platforms like Railway
+    setImmediate(() => {
+      crawler.runNow().catch(err => console.error('Crawler run failed:', err));
+    });
+
+    return res.status(202).json({ success: true, message: 'Crawler started', data: { started: true } });
   } catch (e) {
     console.error(e);
     return res.status(400).json({ success: false, message: e.message || 'Failed to run crawler' });
