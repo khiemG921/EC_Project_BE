@@ -187,7 +187,7 @@ CREATE TABLE IF NOT EXISTS {table_name} (
         if image_url is None:
             image_val = 'NULL'
         else:
-            image_val = f"'{str(image_url).replace("'", "\\'")}'"
+            image_val = "'" + str(image_url).replace("'", "\\'") + "'"
         insert = f"""
 INSERT INTO {table_name} (title, content, image_url, source) VALUES (
     '{title}',
