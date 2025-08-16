@@ -98,10 +98,8 @@ app.use('/api/admin/statistics', adminStatisticsRoutes);
 app.get('/api/', (req, res) => res.send('API đang chạy.'));
 
 // ============== START SERVER ==============
-const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
-  console.log(`Server đang chạy trên cổng ${PORT}`);
-  console.log(`API endpoint: http://localhost:${PORT}/api/`);
+const server = app.listen(process.env.PORT, process.env.HOST, () => {
+  console.log(`Server đang chạy trên ${process.env.HOST}:${process.env.PORT}`);
   try {
     crawlerService.init();
     console.log('Crawler service initialized');
