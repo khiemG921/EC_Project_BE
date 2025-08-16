@@ -4,7 +4,7 @@ const { spawn } = require('child_process');
 const cron = require('node-cron');
 
 const DATA_DIR = path.resolve(__dirname, '../../data');
-const OUTPUT_DIR_DEFAULT = path.resolve(__dirname, '../../../data_crawling/output');
+const OUTPUT_DIR_DEFAULT = path.resolve(__dirname, '../../data_crawling/output');
 const CONFIG_PATH = path.join(DATA_DIR, 'crawler_config.json');
 
 let state = {
@@ -15,8 +15,8 @@ let state = {
   lastMessage: null,
   pythonPath: process.env.CRAWLER_PYTHON || 'python',
   mode: process.env.CRAWLER_MODE === 'notebook' ? 'notebook' : 'script', // notebook|script
-  notebookPath: path.resolve(__dirname, '../../../data_crawling/data_collection.ipynb'),
-  scriptPath: path.resolve(__dirname, '../../../data_crawling/crawl_news.py'),
+  notebookPath: path.resolve(__dirname, '../../data_crawling/data_collection.ipynb'),
+  scriptPath: path.resolve(__dirname, '../../data_crawling/crawl_news.py'),
   outputDir: OUTPUT_DIR_DEFAULT,
   lastOutputFile: null,
 };
@@ -141,7 +141,7 @@ async function runNow() {
       if (!files.length && state.mode === 'notebook') {
         // As a fallback, scan data_crawling for any CSV and copy latest to outputDir
         try {
-          const dcDir = path.resolve(__dirname, '../../../data_crawling');
+          const dcDir = path.resolve(__dirname, '../../data_crawling');
           const dcCsvs = fs.readdirSync(dcDir)
             .filter(f => f.toLowerCase().endsWith('.csv'))
             .map(name => {
