@@ -12,14 +12,14 @@ const app = express();
 
 // ============== MIDDLEWARES ==============
 const corsOptions = {
-  origin: 'http://localhost:3000',
+  origin: 'https://ec-project-fe-1420005c8b95.herokuapp.com',
   credentials: true,
   methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','Authorization'],
   optionsSuccessStatus: 204
 };
 
-app.use(cors());
+app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use(cookieParser());
