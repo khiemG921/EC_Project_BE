@@ -40,8 +40,8 @@ router.post("/session", (req, res) => {
 
   res.cookie("token", idToken, {
     httpOnly: true,
-    secure: false, // Đặt false cho localhost
-    sameSite: "lax",
+    secure: true,
+    sameSite: "None",
     maxAge: 60 * 60 * 1000, // 1 giờ
   });
 
