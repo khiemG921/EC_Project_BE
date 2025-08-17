@@ -13,7 +13,7 @@ let state = {
   lastRun: null,
   lastStatus: 'idle', // idle|running|success|error
   lastMessage: null,
-  pythonPath: process.env.CRAWLER_PYTHON || 'python',
+  pythonPath: process.env.CRAWLER_PYTHON || '/opt/venv/bin/python',
   mode: process.env.CRAWLER_MODE === 'notebook' ? 'notebook' : 'script', // notebook|script
   notebookPath: path.resolve(__dirname, '../../data_crawling/data_collection.ipynb'),
   scriptPath: path.resolve(__dirname, '../../data_crawling/crawl_news.py'),
@@ -120,6 +120,8 @@ async function runNow() {
     args.push(state.scriptPath, '--out', outCsv, '--max-items', String(maxItems), '--max-pages', String(maxPages));
     if (headlessFlag) args.push('--headless');
   }
+
+  console.log('Spawning crawler with command:', cmd, args.join(' '));
 
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, {

@@ -19,6 +19,8 @@ import sys
 import time
 from typing import List, Dict, Optional
 import shutil
+import tempfile
+import atexit
 
 import pandas as pd
 import requests
@@ -57,9 +59,28 @@ def setup_driver(chromedriver_path: Optional[str] = None, headless: bool = False
     if chrome_bin:
         options.binary_location = chrome_bin
 
-    # Build service
+    # Ensure a unique user-data-dir per run to avoid "user data directory is already in use" errors
     try:
-        service = Service(chromedriver_bin) if chromedriver_bin else Service()
+        user_data_dir = tempfile.mkdtemp(prefix="chrome-user-data-")
+        # schedule cleanup when process exits
+        try:
+            atexit.register(lambda: shutil.rmtree(user_data_dir, ignore_errors=True))
+        except Exception:
+            pass
+        options.add_argument(f"--user-data-dir={user_data_dir}")
+        # also disable extensions and first-run checks
+        options.add_argument("--disable-extensions")
+        options.add_argument("--no-first-run")
+        options.add_argument("--disable-background-networking")
+    except Exception:
+        # if tempfile fails, continue without custom user-data-dir
+        pass
+
+    # Build service and enable chromedriver logging to /tmp/chromedriver.log
+    try:
+        # Print debug info early so logs show what paths we attempted
+        print(f"[DEBUG] setup_driver chrome_bin={chrome_bin} chromedriver_bin={chromedriver_bin}")
+        service = Service(chromedriver_bin, log_path="/tmp/chromedriver.log") if chromedriver_bin else Service(log_path="/tmp/chromedriver.log")
     except TypeError:
         # selenium's Service may raise on bad path types
         raise RuntimeError(f"Invalid chromedriver path: {chromedriver_bin}")
@@ -67,8 +88,17 @@ def setup_driver(chromedriver_path: Optional[str] = None, headless: bool = False
     try:
         driver = webdriver.Chrome(service=service, options=options)
     except Exception as e:
+        # try to include chromedriver log tail (if present) for easier diagnosis
+        extra = ""
+        try:
+            if os.path.exists('/tmp/chromedriver.log'):
+                with open('/tmp/chromedriver.log', 'r', encoding='utf-8', errors='ignore') as lf:
+                    tail = lf.read()[-8000:]
+                    extra = f"\n--- chromedriver.log (tail) ---\n{tail}\n--- end log ---\n"
+        except Exception:
+            extra = "\n(could not read /tmp/chromedriver.log)\n"
         # surface helpful debug info
-        msg = f"Failed to start Chrome WebDriver. chrome_bin={chrome_bin} chromedriver_bin={chromedriver_bin} error={e}"
+        msg = f"Failed to start Chrome WebDriver. chrome_bin={chrome_bin} chromedriver_bin={chromedriver_bin} error={e}{extra}"
         raise RuntimeError(msg)
 
     # Hide webdriver flag
