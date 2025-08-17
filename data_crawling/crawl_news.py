@@ -18,6 +18,7 @@ import os
 import sys
 import time
 from typing import List, Dict, Optional
+import shutil
 
 import pandas as pd
 import requests
@@ -33,16 +34,42 @@ DEFAULT_BASE_URL = "https://jupviec.vn/tin-moi-cap-nhat"
 
 def setup_driver(chromedriver_path: Optional[str] = None, headless: bool = False):
     options = webdriver.ChromeOptions()
+
+    # Headless and common flags for containerized Chrome
     if headless:
-        options.add_argument("--headless=new")
-        options.add_argument("--disable-gpu")
+        # use the newer headless mode when available
+        try:
+            options.add_argument("--headless=new")
+        except Exception:
+            options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option('useAutomationExtension', False)
     options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0 Safari/537.36")
 
-    service = Service(chromedriver_path) if chromedriver_path else Service()
-    driver = webdriver.Chrome(service=service, options=options)
+    # Try to detect chrome binary and chromedriver
+    chrome_bin = os.environ.get('CHROME_BIN') or shutil.which('google-chrome') or shutil.which('chromium') or shutil.which('chromium-browser')
+    chromedriver_bin = chromedriver_path or os.environ.get('CHROMEDRIVER_BIN') or shutil.which('chromedriver')
+
+    if chrome_bin:
+        options.binary_location = chrome_bin
+
+    # Build service
+    try:
+        service = Service(chromedriver_bin) if chromedriver_bin else Service()
+    except TypeError:
+        # selenium's Service may raise on bad path types
+        raise RuntimeError(f"Invalid chromedriver path: {chromedriver_bin}")
+
+    try:
+        driver = webdriver.Chrome(service=service, options=options)
+    except Exception as e:
+        # surface helpful debug info
+        msg = f"Failed to start Chrome WebDriver. chrome_bin={chrome_bin} chromedriver_bin={chromedriver_bin} error={e}"
+        raise RuntimeError(msg)
 
     # Hide webdriver flag
     try:
