@@ -21,7 +21,7 @@ const createJob = async (req, res) => {
         }
 
         // Lấy payload từ body
-        const { serviceId, serviceDetailId, location } = req.body;
+        const { serviceId, serviceDetailId, location, description, totalDuration } = req.body;
 
         // Tạo record mới
         const job = await Job.create({
@@ -29,6 +29,8 @@ const createJob = async (req, res) => {
             service_id: serviceId,
             service_detail_id: serviceDetailId || null,
             location: location || null,
+            description: description || null,
+            total_duration: totalDuration || null,
         });
 
         return res.status(201).json(job);

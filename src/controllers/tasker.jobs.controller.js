@@ -3,6 +3,7 @@ const Job = require('../models/job');
 const Service = require('../models/service');
 const ServiceDetail = require('../models/service_detail');
 const Tasker = require('../models/tasker');
+const Transaction = require('../models/transaction');
 
 // Thông tin liên hệ hỗ trợ (lấy từ UX hủy của khách hàng: 1900 8888)
 const SUPPORT_CONTACT = {
@@ -16,30 +17,59 @@ function isLocationInCity(location, cityCode) {
     const s = String(location).toLowerCase();
     const checks = {
         hcm: [
-            'tp hcm', 'tp.hcm', 'hcm', 'tp ho chi minh', 'tp hồ chí minh', 'ho chi minh', 'hồ chí minh',
-            'sai gon', 'sài gòn', 'sg', 'tphcm'
+            'tp hcm',
+            'tp.hcm',
+            'hcm',
+            'tp ho chi minh',
+            'tp hồ chí minh',
+            'ho chi minh',
+            'hồ chí minh',
+            'sai gon',
+            'sài gòn',
+            'sg',
+            'tphcm',
         ],
         hanoi: ['hà nội', 'ha noi', 'hn'],
-        danang: ['đà nẵng', 'da nang', 'dn']
+        danang: ['đà nẵng', 'da nang', 'dn'],
     };
     const variants = checks[cityCode] || [];
-    return variants.some(v => s.includes(v));
+    return variants.some((v) => s.includes(v));
 }
 
 function toCityCode(cityParam) {
     if (!cityParam) return null;
     const c = String(cityParam).toLowerCase();
-    if (['hcm', 'tphcm', 'tp.hcm', 'ho-chi-minh', 'ho_chi_minh'].includes(c)) return 'hcm';
+    if (['hcm', 'tphcm', 'tp.hcm', 'ho-chi-minh', 'ho_chi_minh'].includes(c))
+        return 'hcm';
     if (['hanoi', 'ha-noi', 'ha_noi', 'hn'].includes(c)) return 'hanoi';
     if (['danang', 'da-nang', 'da_nang', 'dn'].includes(c)) return 'danang';
     return null;
 }
 
-async function getEstimatedEarnings(service_id) {
+async function getEstimatedEarnings(service_id, job_id) {
     try {
-        const minPrice = await ServiceDetail.min('price', { where: { service_id } });
-        if (minPrice && Number(minPrice) > 0) return Number(minPrice);
-    } catch { }
+        let commission; // Mặc định là 10%
+        if (service_id === 1 || service_id === 2) {
+            commission = 0.15;
+        } else if (service_id === 4 || service_id === 5 || service_id === 8) {
+            commission = 0.2;
+        } else {
+            commission = 0.1;
+        }
+
+        const transactionRecord = await Transaction.findOne({
+            where: {
+                job_id: job_id,
+            },
+            attributes: ['amount'],
+        });
+
+        const amountValue = transactionRecord && transactionRecord.amount ? parseFloat(transactionRecord.amount) : 0;
+        const earning = amountValue * parseFloat(commission);
+
+        if (isNaN(earning)) return 200000; // fallback to default earning
+        return earning.toFixed(2);
+    } catch {}
     return 200000; // fallback
 }
 
@@ -47,9 +77,16 @@ async function getEstimatedEarnings(service_id) {
 exports.listJobsByCity = async (req, res) => {
     try {
         const firebaseUid = req.user?.uid;
-        if (!firebaseUid) return res.status(401).json({ message: 'Unauthorized' });
-        const tasker = await Tasker.findOne({ where: { firebase_id: firebaseUid } });
-        if (!tasker) return res.status(403).json({ message: 'Chỉ tasker mới được truy cập' });
+        if (!firebaseUid)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const tasker = await Tasker.findOne({
+            where: { firebase_id: firebaseUid },
+            attributes: ['tasker_id'],
+        });
+        if (!tasker)
+            return res
+                .status(403)
+                .json({ message: 'Chỉ tasker mới được truy cập' });
 
         const cityCode = toCityCode(req.query.city) || 'hcm';
 
@@ -58,29 +95,31 @@ exports.listJobsByCity = async (req, res) => {
             where: {
                 [Op.or]: [
                     { status: 'pending' },
-                    { status: 'in_progress', tasker_id: tasker.tasker_id }
-                ]
+                    { status: 'in_progress', tasker_id: tasker.tasker_id },
+                ],
             },
-            include: [
-                { model: Service, as: 'service' }
-            ],
-            order: [['created_at', 'DESC']]
+            include: [{ model: Service, as: 'service' }],
+            order: [['created_at', 'DESC']],
         });
 
         const filtered = [];
         for (const j of jobs) {
             if (!isLocationInCity(j.location, cityCode)) continue;
-            const accepted = j.tasker_id === tasker.tasker_id && j.status === 'in_progress';
-            const est = await getEstimatedEarnings(j.service_id);
+            const accepted =
+                j.tasker_id === tasker.tasker_id && j.status === 'in_progress';
+            const est = await getEstimatedEarnings(j.service_id, j.job_id);
             filtered.push({
                 job_id: j.job_id,
-                service: { name: j.service?.name, service_id: String(j.service_id) },
+                service: {
+                    name: j.service?.name,
+                    service_id: String(j.service_id),
+                },
                 location: j.location,
                 created_at: j.created_at,
                 noted: j.noted,
                 status: j.status,
                 accepted,
-                estimated_earnings: est
+                estimated_earnings: est,
             });
         }
 
@@ -95,19 +134,37 @@ exports.listJobsByCity = async (req, res) => {
 exports.acceptJob = async (req, res) => {
     try {
         const firebaseUid = req.user?.uid;
-        if (!firebaseUid) return res.status(401).json({ message: 'Unauthorized' });
-        const tasker = await Tasker.findOne({ where: { firebase_id: firebaseUid } });
-        if (!tasker) return res.status(403).json({ message: 'Chỉ tasker mới được truy cập' });
+        if (!firebaseUid)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const tasker = await Tasker.findOne({
+            where: { firebase_id: firebaseUid },
+            attributes: ['tasker_id'],
+        });
+        if (!tasker)
+            return res
+                .status(403)
+                .json({ message: 'Chỉ tasker mới được truy cập' });
 
         const { jobId } = req.params;
         const job = await Job.findByPk(jobId);
-        if (!job) return res.status(404).json({ message: 'Không tìm thấy công việc' });
+        if (!job)
+            return res
+                .status(404)
+                .json({ message: 'Không tìm thấy công việc' });
         if (job.status !== 'pending' || job.tasker_id) {
-            return res.status(400).json({ message: 'Công việc không ở trạng thái có thể nhận' });
+            return res
+                .status(400)
+                .json({ message: 'Công việc không ở trạng thái có thể nhận' });
         }
 
-        await job.update({ tasker_id: tasker.tasker_id, status: 'in_progress' });
-        return res.json({ message: 'Nhận việc thành công', job_id: job.job_id });
+        await job.update({
+            tasker_id: tasker.tasker_id,
+            status: 'in_progress',
+        });
+        return res.json({
+            message: 'Nhận việc thành công',
+            job_id: job.job_id,
+        });
     } catch (err) {
         console.error('acceptJob error:', err);
         res.status(500).json({ message: 'Server error' });
@@ -121,25 +178,39 @@ exports.acceptJob = async (req, res) => {
 exports.getJobDetail = async (req, res) => {
     try {
         const firebaseUid = req.user?.uid;
-        if (!firebaseUid) return res.status(401).json({ message: 'Unauthorized' });
-        const tasker = await Tasker.findOne({ where: { firebase_id: firebaseUid } });
-        if (!tasker) return res.status(403).json({ message: 'Chỉ tasker mới được truy cập' });
+        if (!firebaseUid)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const tasker = await Tasker.findOne({
+            where: { firebase_id: firebaseUid },
+            attributes: ['tasker_id'],
+        });
+        if (!tasker)
+            return res
+                .status(403)
+                .json({ message: 'Chỉ tasker mới được truy cập' });
 
         const { jobId } = req.params;
-        const job = await Job.findByPk(jobId, {
-            include: [
-                { model: Service, as: 'service' },
-                { model: ServiceDetail, as: 'job_service_detail' },
-            ],
-        });
-        if (!job) return res.status(404).json({ message: 'Không tìm thấy công việc' });
+        const job = await Job.findByPk(jobId);
+        if (!job)
+            return res
+                .status(404)
+                .json({ message: 'Không tìm thấy công việc' });
 
         const isAssignedToMe = job.tasker_id === tasker.tasker_id;
-        if (!(job.status === 'pending' || (job.status === 'in_progress' && isAssignedToMe))) {
-            return res.status(403).json({ message: 'Bạn không có quyền xem chi tiết công việc này' });
+        if (
+            !(
+                job.status === 'pending' ||
+                (job.status === 'in_progress' && isAssignedToMe)
+            )
+        ) {
+            return res
+                .status(403)
+                .json({
+                    message: 'Bạn không có quyền xem chi tiết công việc này',
+                });
         }
-
-        const estimated_earnings = await getEstimatedEarnings(job.service_id);
+        
+        const estimated_earnings = await getEstimatedEarnings(job.service_id, job.job_id);
         const detail = {
             job_id: job.job_id,
             status: job.status,
@@ -148,18 +219,8 @@ exports.getJobDetail = async (req, res) => {
             location: job.location,
             noted: job.noted,
             accepted: isAssignedToMe && job.status === 'in_progress',
-            service: job.service ? {
-                service_id: String(job.service_id),
-                name: job.service.name,
-                type: job.service.type || null,
-            } : { service_id: String(job.service_id) },
-            service_detail: job.job_service_detail ? {
-                service_detail_id: String(job.service_detail_id),
-                name: job.job_service_detail.name,
-                type: job.job_service_detail.type,
-                price: job.job_service_detail.price,
-                duration: job.job_service_detail.duration,
-            } : null,
+            description: job.description || null,
+            duration: job.total_duration || null,
             estimated_earnings,
         };
 
@@ -198,13 +259,23 @@ exports.getTaskerRegulations = async (_req, res) => {
 exports.requestCancelJob = async (req, res) => {
     try {
         const firebaseUid = req.user?.uid;
-        if (!firebaseUid) return res.status(401).json({ message: 'Unauthorized' });
-        const tasker = await Tasker.findOne({ where: { firebase_id: firebaseUid } });
-        if (!tasker) return res.status(403).json({ message: 'Chỉ tasker mới được truy cập' });
+        if (!firebaseUid)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const tasker = await Tasker.findOne({
+            where: { firebase_id: firebaseUid },
+            attributes: ['tasker_id'],
+        });
+        if (!tasker)
+            return res
+                .status(403)
+                .json({ message: 'Chỉ tasker mới được truy cập' });
 
         const { jobId } = req.params;
         const job = await Job.findByPk(jobId);
-        if (!job) return res.status(404).json({ message: 'Không tìm thấy công việc' });
+        if (!job)
+            return res
+                .status(404)
+                .json({ message: 'Không tìm thấy công việc' });
 
         // Always deny and guide to hotline
         return res.status(403).json({

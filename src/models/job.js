@@ -33,6 +33,16 @@ const Job = sequelize.define('Job', {
     allowNull: true,
     defaultValue: null
   },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    defaultValue: null
+  },
+  total_duration: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: null
+  },
   location: {
     type: DataTypes.TEXT,
     allowNull: true,

@@ -1,5 +1,6 @@
 const Customer = require('../models/customer');
 const Tasker = require('../models/tasker');
+const sequelize = require('../config/db');
 const { updateUserClaims } = require('../config/firebase');
 
 // Tạo đơn đăng ký làm tasker
@@ -136,9 +137,17 @@ const approveTaskerApplication = async (req, res) => {
             });
         }
 
+        if (!customer.firebase_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Tài khoản này thiếu thông tin firebase_id'
+            });
+        }
+
         // Kiểm tra xem đã là tasker chưa
         const existingTasker = await Tasker.findOne({
-            where: { firebase_id: customer.firebase_id }
+            where: { firebase_id: customer.firebase_id },
+            attributes: ['tasker_id']
         });
 
         if (existingTasker) {
@@ -148,16 +157,45 @@ const approveTaskerApplication = async (req, res) => {
             });
         }
 
-        // Tạo tasker mới
-        await Tasker.create({
-            firebase_id: customer.firebase_id,
-            name: customer.name,
-            avatar_url: customer.avatar_url,
-            skills: customer.tasker_skills,
-            job_completed: 0,
-            rating: 0,
-            ranking: 'bronze',
-            active: true
+        // Fallback an toàn cho name/skills
+        const safeName = customer.name && customer.name.trim()
+          ? customer.name.trim()
+          : (customer.email ? String(customer.email).split('@')[0] : `Tasker ${customer.customer_id}`);
+        const safeSkills = customer.tasker_skills && String(customer.tasker_skills).trim() !== ''
+          ? String(customer.tasker_skills).trim()
+          : null;
+
+        // Ghi DB trong transaction 
+        await sequelize.transaction(async (t) => {
+                        await Tasker.create(
+                            {
+                                firebase_id: customer.firebase_id,
+                                name: safeName,
+                                avatar_url: customer.avatar_url || null,
+                                skills: safeSkills,
+                                job_completed: 0,
+                                rating: 0,
+                                ranking: 'bronze',
+                                active: true,
+                            },
+                            {
+                                transaction: t,
+                                fields: [
+                                    'firebase_id',
+                                    'name',
+                                    'avatar_url',
+                                    'skills',
+                                    'job_completed',
+                                    'rating',
+                                    'ranking',
+                                    'active',
+                                ],
+                            }
+                        );
+
+            await customer.update({
+                tasker_application_status: 'approved'
+            }, { transaction: t });
         });
 
         // Cập nhật Firebase custom claims 
@@ -166,12 +204,6 @@ const approveTaskerApplication = async (req, res) => {
         } catch (firebaseError) {
             console.error('Error updating Firebase claims:', firebaseError);
         }
-
-        // Cập nhật trạng thái customer
-        await customer.update({ 
-            tasker_application_status: 'approved' 
-        });
-
 
         res.json({
             success: true,

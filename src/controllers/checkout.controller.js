@@ -48,6 +48,7 @@ const checkoutHourly = async (req, res) => {
         totalPrice += cleanSub;
         breakdown.push({
             service: 'hourly',
+            detail_id: cleanDetail.service_detail_id,
             name: cleanDetail.name,
             unitPrice: cleanDetail.price,
             multiplier: staff_count,
@@ -69,7 +70,8 @@ const checkoutHourly = async (req, res) => {
                     totalPrice += sub;
                     breakdown.push({
                         service: 'hourly',
-                        name: ex.name,
+                        detail_id: det.service_detail_id,
+                        name: det.name,
                         unitPrice: det.price,
                         multiplier: staff_count,
                         subTotal: sub,
@@ -160,6 +162,7 @@ const checkoutPeriodic = async (req, res) => {
         totalPrice += baseSub;
         breakdown.push({
             service: 'periodic',
+            detail_id: baseDetail.service_detail_id,
             name: baseDetail.name,
             unitPrice: baseDetail.price,
             multiplier: sessionCount,
@@ -183,6 +186,7 @@ const checkoutPeriodic = async (req, res) => {
                     totalPrice += sub;
                     breakdown.push({
                         service: 'periodic',
+                        detail_id: det.service_detail_id,
                         name: det.name,
                         unitPrice: det.price,
                         multiplier: sessionCount,
@@ -313,7 +317,7 @@ const checkoutACCleaning = async (req, res) => {
 };
 
 const checkoutUpholstery = async (req, res) => {
-    const { selectedItems } = req.body;
+    const { selectedItems, voucher_code } = req.body;
     const service_id = 4;
     if (!selectedItems || Object.keys(selectedItems).length === 0) {
         return res.status(400).json({ error: 'Thiếu thông tin dịch vụ.' });
@@ -321,6 +325,7 @@ const checkoutUpholstery = async (req, res) => {
 
     try {
         let totalPrice = 0;
+        let discount = 0;
         const breakdown = [];
 
         for (const [idKey, qty] of Object.entries(selectedItems)) {
@@ -334,6 +339,7 @@ const checkoutUpholstery = async (req, res) => {
                 totalPrice += subTotal;
                 breakdown.push({
                     service: 'upholstery',
+                    detail_id: detail.service_detail_id,
                     name: detail.name,
                     unitPrice: detail.price,
                     multiplier: qty,
@@ -342,7 +348,23 @@ const checkoutUpholstery = async (req, res) => {
             }
         }
 
-        return res.json({ totalPrice, breakdown });
+        // Áp dụng voucher nếu có
+        if (voucher_code) {
+            const v = await Voucher.findOne({
+                where: {
+                    voucher_code,
+                    expiry_date: { [Op.gt]: new Date() },
+                },
+                attributes: ['discount_percentage'],
+                raw: true,
+            });
+            if (v) {
+                discount = Math.floor(totalPrice * (v.discount_percentage / 100));
+                totalPrice -= discount;
+            }
+        }
+
+        return res.json({ totalPrice, discount, breakdown });
     } catch (err) {
         console.error(err);
         return res.status(500).json({ error: 'System error' });
@@ -374,6 +396,7 @@ const checkoutBusinessCleaning = async (req, res) => {
             totalPrice += subTotal;
             breakdown.push({
                 service: 'businessCleaning',
+                detail_id: detail.service_detail_id,
                 name: detail.name,
                 unitPrice: detail.price,
                 multiplier: area,
