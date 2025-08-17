@@ -115,6 +115,7 @@ async function runNow() {
     // Script mode: pass output path and limit to 10 items in headless mode by default
     const maxItems = Number(process.env.CRAWLER_MAX_ITEMS || 10);
     const maxPages = Number(process.env.CRAWLER_MAX_PAGES || 10);
+    console.log("Script path:", state.scriptPath);
     const headlessFlag = (process.env.CRAWLER_HEADLESS || 'true').toLowerCase() !== 'false';
     args.push(state.scriptPath, '--out', outCsv, '--max-items', String(maxItems), '--max-pages', String(maxPages));
     if (headlessFlag) args.push('--headless');
