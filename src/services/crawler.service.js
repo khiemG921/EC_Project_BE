@@ -4,7 +4,7 @@ const { spawn } = require('child_process');
 const cron = require('node-cron');
 
 const DATA_DIR = path.resolve(__dirname, '../../data');
-const OUTPUT_DIR_DEFAULT = path.resolve(__dirname, '../../../data_crawling/output');
+const OUTPUT_DIR_DEFAULT = path.resolve(__dirname, '../../data_crawling/output');
 const CONFIG_PATH = path.join(DATA_DIR, 'crawler_config.json');
 
 let state = {
@@ -13,10 +13,10 @@ let state = {
   lastRun: null,
   lastStatus: 'idle', // idle|running|success|error
   lastMessage: null,
-  pythonPath: process.env.CRAWLER_PYTHON || 'python',
+  pythonPath: process.env.CRAWLER_PYTHON || '/opt/venv/bin/python',
   mode: process.env.CRAWLER_MODE === 'notebook' ? 'notebook' : 'script', // notebook|script
-  notebookPath: path.resolve(__dirname, '../../../data_crawling/data_collection.ipynb'),
-  scriptPath: path.resolve(__dirname, '../../../data_crawling/crawl_news.py'),
+  notebookPath: path.resolve(__dirname, '../../data_crawling/data_collection.ipynb'),
+  scriptPath: path.resolve(__dirname, '../../data_crawling/crawl_news.py'),
   outputDir: OUTPUT_DIR_DEFAULT,
   lastOutputFile: null,
 };
@@ -115,10 +115,13 @@ async function runNow() {
     // Script mode: pass output path and limit to 10 items in headless mode by default
     const maxItems = Number(process.env.CRAWLER_MAX_ITEMS || 10);
     const maxPages = Number(process.env.CRAWLER_MAX_PAGES || 10);
+    console.log("Script path:", state.scriptPath);
     const headlessFlag = (process.env.CRAWLER_HEADLESS || 'true').toLowerCase() !== 'false';
     args.push(state.scriptPath, '--out', outCsv, '--max-items', String(maxItems), '--max-pages', String(maxPages));
     if (headlessFlag) args.push('--headless');
   }
+
+  console.log('Spawning crawler with command:', cmd, args.join(' '));
 
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, {
@@ -141,7 +144,7 @@ async function runNow() {
       if (!files.length && state.mode === 'notebook') {
         // As a fallback, scan data_crawling for any CSV and copy latest to outputDir
         try {
-          const dcDir = path.resolve(__dirname, '../../../data_crawling');
+          const dcDir = path.resolve(__dirname, '../../data_crawling');
           const dcCsvs = fs.readdirSync(dcDir)
             .filter(f => f.toLowerCase().endsWith('.csv'))
             .map(name => {

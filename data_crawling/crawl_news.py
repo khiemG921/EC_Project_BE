@@ -18,6 +18,9 @@ import os
 import sys
 import time
 from typing import List, Dict, Optional
+import shutil
+import tempfile
+import atexit
 
 import pandas as pd
 import requests
@@ -33,16 +36,70 @@ DEFAULT_BASE_URL = "https://jupviec.vn/tin-moi-cap-nhat"
 
 def setup_driver(chromedriver_path: Optional[str] = None, headless: bool = False):
     options = webdriver.ChromeOptions()
+
+    # Headless and common flags for containerized Chrome
     if headless:
-        options.add_argument("--headless=new")
-        options.add_argument("--disable-gpu")
+        # use the newer headless mode when available
+        try:
+            options.add_argument("--headless=new")
+        except Exception:
+            options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option('useAutomationExtension', False)
     options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0 Safari/537.36")
 
-    service = Service(chromedriver_path) if chromedriver_path else Service()
-    driver = webdriver.Chrome(service=service, options=options)
+    # Try to detect chrome binary and chromedriver
+    chrome_bin = os.environ.get('CHROME_BIN') or shutil.which('google-chrome') or shutil.which('chromium') or shutil.which('chromium-browser')
+    chromedriver_bin = chromedriver_path or os.environ.get('CHROMEDRIVER_BIN') or shutil.which('chromedriver')
+
+    if chrome_bin:
+        options.binary_location = chrome_bin
+
+    # Ensure a unique user-data-dir per run to avoid "user data directory is already in use" errors
+    try:
+        user_data_dir = tempfile.mkdtemp(prefix="chrome-user-data-")
+        # schedule cleanup when process exits
+        try:
+            atexit.register(lambda: shutil.rmtree(user_data_dir, ignore_errors=True))
+        except Exception:
+            pass
+        options.add_argument(f"--user-data-dir={user_data_dir}")
+        # also disable extensions and first-run checks
+        options.add_argument("--disable-extensions")
+        options.add_argument("--no-first-run")
+        options.add_argument("--disable-background-networking")
+    except Exception:
+        # if tempfile fails, continue without custom user-data-dir
+        pass
+
+    # Build service and enable chromedriver logging to /tmp/chromedriver.log
+    try:
+        # Print debug info early so logs show what paths we attempted
+        print(f"[DEBUG] setup_driver chrome_bin={chrome_bin} chromedriver_bin={chromedriver_bin}")
+        service = Service(chromedriver_bin, log_path="/tmp/chromedriver.log") if chromedriver_bin else Service(log_path="/tmp/chromedriver.log")
+    except TypeError:
+        # selenium's Service may raise on bad path types
+        raise RuntimeError(f"Invalid chromedriver path: {chromedriver_bin}")
+
+    try:
+        driver = webdriver.Chrome(service=service, options=options)
+    except Exception as e:
+        # try to include chromedriver log tail (if present) for easier diagnosis
+        extra = ""
+        try:
+            if os.path.exists('/tmp/chromedriver.log'):
+                with open('/tmp/chromedriver.log', 'r', encoding='utf-8', errors='ignore') as lf:
+                    tail = lf.read()[-8000:]
+                    extra = f"\n--- chromedriver.log (tail) ---\n{tail}\n--- end log ---\n"
+        except Exception:
+            extra = "\n(could not read /tmp/chromedriver.log)\n"
+        # surface helpful debug info
+        msg = f"Failed to start Chrome WebDriver. chrome_bin={chrome_bin} chromedriver_bin={chromedriver_bin} error={e}{extra}"
+        raise RuntimeError(msg)
 
     # Hide webdriver flag
     try:
@@ -187,7 +244,7 @@ CREATE TABLE IF NOT EXISTS {table_name} (
         if image_url is None:
             image_val = 'NULL'
         else:
-            image_val = f"'{str(image_url).replace("'", "\\'")}'"
+            image_val = "'" + str(image_url).replace("'", "\\'") + "'"
         insert = f"""
 INSERT INTO {table_name} (title, content, image_url, source) VALUES (
     '{title}',
