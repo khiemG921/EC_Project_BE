@@ -3,6 +3,12 @@ const cors = require('cors');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 
+// Ensure NODE_ENV is set for local development if not provided by environment
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = 'development';
+}
+console.log('NODE_ENV =', process.env.NODE_ENV);
+
 // ============== DATABASE CONNECTIONS ==============
 
 // FOR LOCAL MYSQL (Sequelize)

@@ -38,11 +38,10 @@ router.post("/session", (req, res) => {
   console.log("[DEBUG] Backend received idToken:", idToken);
   console.log("Received idToken for session:", idToken ? "Token received" : "No token");
 
-  const isProd = process.env.NODE_ENV === 'production';
   res.cookie("token", idToken, {
     httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? "None" : "Lax",
+    secure: true,
+    sameSite: "None",
     maxAge: 60 * 60 * 1000, // 1 giờ
   });
 
