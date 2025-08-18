@@ -12,7 +12,7 @@ const app = express();
 
 // ============== MIDDLEWARES ==============
 const corsOptions = {
-  origin: 'https://ec-project-fe-1420005c8b95.herokuapp.com',
+  origin: process.env.cors_origin.split(','),
   credentials: true,
   methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','Authorization'],
