@@ -83,6 +83,7 @@ const findCustomer = async (req, res) => {
     });
 };
 
+
 const updateCustomerProfile = async (req, res) => {
     try {
         const user = await Customer.findOne({ where: { firebase_id: req.user.uid } });
