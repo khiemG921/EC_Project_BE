@@ -66,37 +66,113 @@ const updateFavoriteServices = async (req, res) => {
     }
 };
 
-const addRefundToCleanPay = async (req, res) => {
-    const { customer_id, amount } = req.body;
-    if (!customer_id || !amount) {
-        return res.status(400).json({ error: 'Thông tin không hợp lệ' });
-    }
-
+const getAmountCleanPay = async (req, res) => {
     try {
-        // 1. Lấy thông tin khách hàng
+        const firebaseUid = req.user.uid;
+        if (!firebaseUid) {
+            return res.status(401).json({ error: 'Chưa đăng nhập!' });
+        }
+
         const row = await sequelize.query(
-            'SELECT reward_points FROM customer WHERE customer_id = :cid',
+            'SELECT reward_points FROM customer WHERE firebase_id = :fid',
             {
-                replacements: { cid: customer_id },
+                replacements: { fid: firebaseUid },
                 type: QueryTypes.SELECT,
             }
         );
 
-        let currentRewardPoints = row?.reward_points || 0;
+        if (!row.length)
+            return res.status(404).json({ error: 'Không tìm thấy khách hàng' });
+
+        return res.json({
+            reward_points: row[0].reward_points || 0,
+        });
+    } catch (e) {
+        console.error('getRewardPoints error:', e);
+        return res.status(500).json({ error: 'Server error' });
+    }
+};
+
+const addRefundToCleanPay = async (req, res) => {
+    const firebaseUid = req.user.uid;
+    if (!firebaseUid) {
+        return res.status(401).json({ error: 'Chưa đăng nhập!' });
+    }
+
+    const row = await sequelize.query(
+        'SELECT customer_id, reward_points FROM customer WHERE firebase_id = :fid',
+        {
+            replacements: { fid: firebaseUid },
+            type: QueryTypes.SELECT,
+        }
+    );
+
+    if (!row.length) {
+        return res.status(404).json({ error: 'Không tìm thấy khách hàng' });
+    }
+
+    const customerId = row[0].customer_id;
+    const { amount } = req.body;
+    if (!amount) {
+        return res.status(400).json({ error: 'Thông tin không hợp lệ' });
+    }
+
+    try {
+        let currentRewardPoints = row[0].reward_points || 0;
 
         // 2. Cập nhật Reward Points
         const newRewardPoints = currentRewardPoints + amount;
         await sequelize.query(
             'UPDATE customer SET reward_points = :rp WHERE customer_id = :cid',
             {
-                replacements: { rp: newRewardPoints, cid: customer_id },
+                replacements: { rp: newRewardPoints, cid: customerId },
                 type: QueryTypes.UPDATE,
             }
         );
 
-        return res.json({ customer_id, reward_points: newRewardPoints });
+        return res.json({ customer_id: customerId, reward_points: newRewardPoints });
     } catch (err) {
         console.error('❌ Lỗi add refund to clean pay:', err);
+        return res.status(500).json({ error: 'Lỗi server.' });
+    }
+};
+
+const subtractAmountCleanPay = async (req, res) => {
+    const { amount } = req.body;
+    const firebaseUid = req.user.uid;
+    if (!firebaseUid) {
+        return res.status(401).json({ error: 'Chưa đăng nhập!' });
+    }
+
+    try {
+        // 1. Lấy thông tin khách hàng
+        const row = await sequelize.query(
+            'SELECT customer_id, reward_points FROM customer WHERE firebase_id = :fid',
+            {
+                replacements: { fid: firebaseUid },
+                type: QueryTypes.SELECT,
+            }
+        );
+        if (!row.length) {
+            return res.status(404).json({ error: 'Không tìm thấy khách hàng' });
+        }
+
+        const customerId = row[0].customer_id;
+        let currentRewardPoints = row[0].reward_points || 0;
+
+        // 2. Cập nhật Reward Points
+        const newRewardPoints = Math.max(currentRewardPoints - amount, 0);
+        await sequelize.query(
+            'UPDATE customer SET reward_points = :rp WHERE customer_id = :cid',
+            {
+                replacements: { rp: newRewardPoints, cid: customerId },
+                type: QueryTypes.UPDATE,
+            }
+        );
+
+        return res.json({ customerId, reward_points: newRewardPoints });
+    } catch (err) {
+        console.error('❌ Lỗi subtract amount from clean pay:', err);
         return res.status(500).json({ error: 'Lỗi server.' });
     }
 };
@@ -104,5 +180,7 @@ const addRefundToCleanPay = async (req, res) => {
 module.exports = {
     getAllCustomers,
     updateFavoriteServices,
+    getAmountCleanPay,
     addRefundToCleanPay,
+    subtractAmountCleanPay,
 };
