@@ -17,7 +17,8 @@ const countUsers = async (req, res) => {
     try {
         activeUsers = await Customer.count({ where: { active: true } });
     } catch (error) {
-        activeUsers = -1;
+
+    activeUsers = totalUsers > 0 ? totalUsers : 0;
     }
     
     return res.json({

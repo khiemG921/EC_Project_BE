@@ -1,31 +1,37 @@
 const Customer = require('../../models/customer.js');
+const Location = require('../../models/location.js');
 const adminAuth = require('../../config/firebase.js');
 
 const getAllUser = async (req, res) => {
     try {
-        const users = await Customer.findAll();
-        
-        // Lấy roles từ Firebase cho mỗi user
-        const usersWithRoles = await Promise.all(users.map(async (user) => {
+        const users = await Customer.findAll({
+            include: [{ model: Location, required: false }]
+        });
+
+        // Lấy roles từ Firebase cho mỗi user và map address từ Location
+        const usersWithExtras = await Promise.all(users.map(async (user) => {
+            const raw = user.toJSON();
+            const address = Array.isArray(raw.Locations) && raw.Locations.length > 0
+                ? (raw.Locations[0]?.detail || '')
+                : '';
+            let roles = ['customer'];
             try {
-                const userRecord = await adminAuth.auth().getUser(user.firebase_id);
+                const userRecord = await adminAuth.auth().getUser(raw.firebase_id);
                 const customClaims = userRecord.customClaims || {};
-                const roles = customClaims.roles || ['customer'];
-                
-                return {
-                    ...user.toJSON(),
-                    roles: roles
-                };
+                const claimRoles = Array.isArray(customClaims.roles) ? customClaims.roles : [];
+                const rset = new Set(['customer', ...claimRoles]);
+                roles = Array.from(rset);
             } catch (firebaseError) {
-                console.log(`Firebase error for user ${user.firebase_id}:`, firebaseError.message);
-                return {
-                    ...user.toJSON(),
-                    roles: ['customer']
-                };
+                console.log(`Firebase error for user ${raw.firebase_id}:`, firebaseError.message);
             }
+            return {
+                ...raw,
+                roles,
+                address
+            };
         }));
-        
-        res.status(200).json(usersWithRoles);
+
+        res.status(200).json(usersWithExtras);
     } catch (error) {
         console.error('Error fetching users:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -71,7 +77,7 @@ const createUser = async (req, res) => {
         }
         
         try {
-            // Lưu thông tin user vào database
+            // Lưu thông tin user vào database (không có cột address trong customer)
             const customerData = {
                 firebase_id: firebaseUser.uid,
                 name: userData.name,
@@ -79,12 +85,34 @@ const createUser = async (req, res) => {
                 phone: userData.phone || null,
                 avatar_url: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name)}&background=14b8a6&color=fff`,
                 gender: userData.gender || null,
-                address: userData.address || null,
                 reward_points: userData.rewardPoints || 0,
                 active: true
             };
-            
+
             const newUser = await Customer.create(customerData);
+
+            // Nếu có address, tạo Location tương ứng
+            if (userData.address) {
+                try {
+                    await Location.create({
+                        customer_id: newUser.customer_id,
+                        longtitude: null,
+                        latitude: null,
+                        city: 'Unknown',
+                        district: 'Unknown',
+                        detail: userData.address
+                    });
+                } catch (e) {
+                    await Location.create({
+                        customer_id: newUser.customer_id,
+                        longtitude: 0,
+                        latitude: 0,
+                        city: 'Unknown',
+                        district: 'Unknown',
+                        detail: userData.address
+                    });
+                }
+            }
 
             // Trả về user với role từ Firebase
             const response = {
@@ -120,18 +148,68 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
     try {
         const { userId } = req.params;
-        const userData = req.body;
-        
-        const [updatedRows] = await Customer.update(userData, {
-            where: { customer_id: userId }
-        });
-        
-        if (updatedRows === 0) {
-            return res.status(404).json({ error: 'User not found' });
+        const body = req.body || {};
+
+        // Chỉ cập nhật các field hợp lệ
+        const allowed = ['name', 'email', 'phone', 'gender', 'avatar_url', 'date_of_birth'];
+        const updates = {};
+        for (const k of allowed) if (body[k] !== undefined) updates[k] = body[k];
+        if (body.dob !== undefined) updates['date_of_birth'] = body.dob;
+
+        // Chuẩn hóa gender nếu có
+        if (updates.gender) {
+            const genderMap = { 'Nam': 'male', 'Nữ': 'female', 'Khác': 'other', male: 'male', female: 'female', other: 'other' };
+            updates.gender = genderMap[updates.gender] || 'other';
         }
-        
-        const updatedUser = await Customer.findOne({ where: { customer_id: userId } });
-        res.status(200).json(updatedUser);
+
+        const [updatedRows] = await Customer.update(updates, { where: { customer_id: userId } });
+        if (updatedRows === 0) return res.status(404).json({ error: 'User not found' });
+
+        // Cập nhật địa chỉ (Location.detail)
+        if (body.address !== undefined) {
+            const existing = await Location.findOne({ where: { customer_id: userId } });
+            if (existing) {
+                await existing.update({ detail: body.address });
+            } else {
+                try {
+                    await Location.create({
+                        customer_id: userId,
+                        longtitude: null,
+                        latitude: null,
+                        city: 'Unknown',
+                        district: 'Unknown',
+                        detail: body.address
+                    });
+                } catch (e) {
+                    await Location.create({
+                        customer_id: userId,
+                        longtitude: 0,
+                        latitude: 0,
+                        city: 'Unknown',
+                        district: 'Unknown',
+                        detail: body.address
+                    });
+                }
+            }
+        }
+
+        const updatedUser = await Customer.findOne({
+            where: { customer_id: userId },
+            include: [{ model: Location, required: false }]
+        });
+        const raw = updatedUser.toJSON();
+        const address = Array.isArray(raw.Locations) && raw.Locations.length > 0 ? (raw.Locations[0]?.detail || '') : '';
+
+        // Attach roles from Firebase
+        let roles = ['customer'];
+        try {
+            const userRecord = await adminAuth.auth().getUser(raw.firebase_id);
+            const customClaims = userRecord.customClaims || {};
+            const claimRoles = Array.isArray(customClaims.roles) ? customClaims.roles : [];
+            roles = Array.from(new Set(['customer', ...claimRoles]));
+        } catch {}
+
+        res.status(200).json({ ...raw, address, roles });
     } catch (error) {
         console.error('Error updating user:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -141,7 +219,13 @@ const updateUser = async (req, res) => {
 const deleteUser = async (req, res) => {
     try {
         const { userId } = req.params;
-        
+        // Prevent deleting your own account
+        const target = await Customer.findOne({ where: { customer_id: userId } });
+        if (!target) return res.status(404).json({ error: 'User not found' });
+        if (req.user?.uid && target.firebase_id === req.user.uid) {
+            return res.status(400).json({ error: 'Không thể tự xóa tài khoản của chính bạn' });
+        }
+
         const deletedRows = await Customer.destroy({
             where: { customer_id: userId }
         });
@@ -166,18 +250,69 @@ const setUserRole = async (req, res) => {
         if (!user) {
             return res.status(404).json({ error: 'User not found in database' });
         }
-        
-        await adminAuth.auth().setCustomUserClaims(user.firebase_id, { roles: [role] });
+        // This legacy endpoint sets a single role; keep for backward compatibility but always include 'customer'
+        const nextRoles = Array.from(new Set(['customer', role])).filter(Boolean);
+        await adminAuth.auth().setCustomUserClaims(user.firebase_id, { roles: nextRoles });
         
         res.status(200).json({ 
             message: 'User role updated successfully', 
             userId: userId,
             firebase_id: user.firebase_id,
-            role: role 
+            roles: nextRoles 
         });
         
     } catch (error) {
         console.error('Error setting user role:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+const grantRole = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { role } = req.body;
+        if (!['admin', 'tasker'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+
+        const user = await Customer.findOne({ where: { customer_id: userId } });
+        if (!user) return res.status(404).json({ error: 'User not found in database' });
+
+        const userRecord = await adminAuth.auth().getUser(user.firebase_id);
+        const customClaims = userRecord.customClaims || {};
+        const current = Array.isArray(customClaims.roles) ? customClaims.roles : [];
+        const roles = Array.from(new Set(['customer', ...current, role]));
+        await adminAuth.auth().setCustomUserClaims(user.firebase_id, { roles });
+
+        res.json({ message: 'Role granted', userId, roles });
+    } catch (error) {
+        console.error('Error granting role:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+const revokeRole = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { role } = req.body;
+        if (!['admin', 'tasker'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+
+        const user = await Customer.findOne({ where: { customer_id: userId } });
+        if (!user) return res.status(404).json({ error: 'User not found in database' });
+
+        // Prevent revoking your own admin role
+        if (role === 'admin' && req.user?.uid && user.firebase_id === req.user.uid) {
+            return res.status(400).json({ error: 'Không thể tự thu hồi quyền admin của bạn' });
+        }
+
+        const userRecord = await adminAuth.auth().getUser(user.firebase_id);
+        const customClaims = userRecord.customClaims || {};
+        const current = Array.isArray(customClaims.roles) ? customClaims.roles : [];
+        const roles = Array.from(new Set(current.filter(r => r !== role && r !== 'customer')));
+        roles.unshift('customer'); // ensure base role
+        await adminAuth.auth().setCustomUserClaims(user.firebase_id, { roles });
+
+        res.json({ message: 'Role revoked', userId, roles });
+    } catch (error) {
+        console.error('Error revoking role:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 }
@@ -187,5 +322,7 @@ module.exports = {
     createUser,
     updateUser,
     deleteUser,
-    setUserRole
+    setUserRole,
+    grantRole,
+    revokeRole
 };
