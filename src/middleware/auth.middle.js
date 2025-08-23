@@ -6,7 +6,9 @@ const admin = require("../config/firebase");
  */
 async function verifyToken(req, res, next) {
   if (req.method === 'OPTIONS') return next();
-  const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+  const headerToken = req.headers.authorization?.split(' ')[1];
+  const cookieToken = req.cookies.token;
+  const token = headerToken || cookieToken;
   if (!token) {
     return res.status(401).json({ message: "Chưa đăng nhập" });
   }
@@ -16,6 +18,18 @@ async function verifyToken(req, res, next) {
     let roles = [];
     if (Array.isArray(decoded.roles)) roles = decoded.roles;
     else if (typeof decoded.role === 'string') roles = [decoded.role];
+
+    // Không có role nào thì không được vào admin
+    if (!roles.length) {
+      try {
+        const userRecord = await admin.auth().getUser(decoded.uid);
+        const cc = userRecord.customClaims || {};
+        if (Array.isArray(cc.roles)) roles = cc.roles;
+        else if (typeof cc.role === 'string') roles = [cc.role];
+      } catch (e) {
+        // ignore
+      }
+    }
     if (!roles.length) roles = ['customer'];
 
     req.user = {
