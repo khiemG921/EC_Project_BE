@@ -42,6 +42,7 @@ router.post("/session", (req, res) => {
     httpOnly: true,
     secure: true,
     sameSite: "None",
+    path: "/",
     maxAge: 60 * 60 * 1000, // 1 giờ
   });
 
@@ -50,7 +51,13 @@ router.post("/session", (req, res) => {
 
 // Xóa session (logout)
 router.delete("/session", (req, res) => {
-  res.cookie("token", "", { maxAge: 0 });
+  res.cookie("token", "", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "None",
+    path: "/",
+    maxAge: 0,
+  });
   res.json({ message: "Đã đăng xuất" });
 });
 

@@ -221,11 +221,15 @@ const becomeTasker = async (req, res) => {
 
 // Verify token và trả về thông tin user đầy đủ
 const verifyUserToken = async (req, res) => {
-  const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+  // Ưu tiên Authorization header trước, sau đó mới đến cookie 
+  const headerToken = req.headers.authorization?.split(' ')[1];
+  const cookieToken = req.cookies.token;
+  const token = headerToken || cookieToken;
 
   console.log('Verify token request:', {
-    hasCookieToken: !!req.cookies.token,
+    hasCookieToken: !!cookieToken,
     hasHeaderToken: !!req.headers.authorization,
+    used: headerToken ? 'header' : (cookieToken ? 'cookie' : 'none'),
     tokenPrefix: token ? token.substring(0, 20) + '...' : 'null'
   });
 
