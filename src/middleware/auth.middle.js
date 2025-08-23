@@ -13,10 +13,15 @@ async function verifyToken(req, res, next) {
 
   try {
     const decoded = await admin.auth().verifyIdToken(token);
+    let roles = [];
+    if (Array.isArray(decoded.roles)) roles = decoded.roles;
+    else if (typeof decoded.role === 'string') roles = [decoded.role];
+    if (!roles.length) roles = ['customer'];
+
     req.user = {
       uid: decoded.uid,
       email: decoded.email,
-      roles: decoded.roles || ["customer"],
+      roles,
     };
     return next();
   } catch (err) {

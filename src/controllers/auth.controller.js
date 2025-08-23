@@ -1,9 +1,9 @@
 const admin = require("../config/firebase");
 const Customer = require("../models/customer");
+const Location = require("../models/location");
 const transporter = require("../config/nodemailer");
 const crypto = require("crypto");
 
-// Simple in-memory store for verification codes (email: { code, expires, verified })
 const codeStore = new Map();
 
 const registerUser = async (req, res) => {
@@ -247,7 +247,8 @@ const verifyUserToken = async (req, res) => {
     
     // Lấy thông tin customer từ database
     const customer = await Customer.findOne({
-      where: { firebase_id: decodedToken.uid }
+      where: { firebase_id: decodedToken.uid },
+      include: [{ model: Location, required: false }]
     });
 
     if (!customer) {
@@ -269,6 +270,12 @@ const verifyUserToken = async (req, res) => {
       roles = [decodedToken.role];
     }
 
+    // Derive address from first Location if present
+    const raw = customer.toJSON();
+    const address = Array.isArray(raw.Locations) && raw.Locations.length > 0
+      ? (raw.Locations[0]?.detail || '')
+      : '';
+
     res.json({
       valid: true,
       user: {
@@ -280,7 +287,11 @@ const verifyUserToken = async (req, res) => {
         firebase_id: decodedToken.uid,
         phone: customer.phone,
         reward_points: customer.reward_points,
-        ranking: customer.ranking
+        ranking: customer.ranking,
+        // Extra profile fields for FE persistence
+        date_of_birth: customer.date_of_birth,
+        gender: customer.gender,
+        address
       }
     });
   } catch (error) {
