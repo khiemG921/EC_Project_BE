@@ -162,7 +162,24 @@ const updateUser = async (req, res) => {
             updates.gender = genderMap[updates.gender] || 'other';
         }
 
-        const [updatedRows] = await Customer.update(updates, { where: { customer_id: userId } });
+        // Validate date format if provided
+        if (updates.date_of_birth && typeof updates.date_of_birth === 'string') {
+            const isoLike = /^\d{4}-\d{2}-\d{2}$/;
+            if (!isoLike.test(updates.date_of_birth)) {
+                return res.status(400).json({ error: 'Ngày sinh không hợp lệ, định dạng YYYY-MM-DD' });
+            }
+        }
+
+        let updatedRows = 0;
+        try {
+            const result = await Customer.update(updates, { where: { customer_id: userId } });
+            updatedRows = result[0];
+        } catch (err) {
+            if (err && (err.name === 'SequelizeUniqueConstraintError' || err.parent?.code === 'ER_DUP_ENTRY')) {
+                return res.status(400).json({ error: 'Email hoặc SĐT đã tồn tại' });
+            }
+            throw err;
+        }
         if (updatedRows === 0) return res.status(404).json({ error: 'User not found' });
 
         // Cập nhật địa chỉ (Location.detail)
@@ -226,6 +243,13 @@ const deleteUser = async (req, res) => {
             return res.status(400).json({ error: 'Không thể tự xóa tài khoản của chính bạn' });
         }
 
+        // Remove dependent locations first to avoid FK constraint issues
+        try {
+            await Location.destroy({ where: { customer_id: userId } });
+        } catch (e) {
+            console.warn('Failed to remove dependent locations for user', userId, e?.message);
+        }
+
         const deletedRows = await Customer.destroy({
             where: { customer_id: userId }
         });
@@ -245,6 +269,10 @@ const setUserRole = async (req, res) => {
     try {
         const { userId } = req.params; 
         const { role } = req.body;
+        // Không cho phép cấp quyền admin
+        if (role === 'admin') {
+            return res.status(403).json({ error: 'Không được phép cấp quyền admin' });
+        }
         
         const user = await Customer.findOne({ where: { customer_id: userId } });
         if (!user) {
@@ -272,6 +300,10 @@ const grantRole = async (req, res) => {
         const { userId } = req.params;
         const { role } = req.body;
         if (!['admin', 'tasker'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+        // Disallow granting admin; only allow tasker
+        if (role === 'admin') {
+            return res.status(403).json({ error: 'Không được phép cấp quyền admin' });
+        }
 
         const user = await Customer.findOne({ where: { customer_id: userId } });
         if (!user) return res.status(404).json({ error: 'User not found in database' });
