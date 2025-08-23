@@ -1,5 +1,10 @@
+const { Op } = require('sequelize');
 const Transaction = require('../models/transaction');
 const Customer    = require('../models/customer');
+
+const Voucher = require('../models/voucher');
+const VoucherUsage = require('../models/voucher_usage');
+const sequelize = require('../config/db');
 
 const createTransaction = async (req, res) => {
   try {
@@ -25,23 +30,43 @@ const createTransaction = async (req, res) => {
       currency,
       paymentGateway,
       status,
-      paidAt
+      paidAt,
+      voucher_code
     } = req.body;
 
-    // 4) Tạo bản ghi transaction
-    const tx = await Transaction.create({
-      transaction_id: transactionId,
-      customer_id:    customer.customer_id,
-      job_id:         jobId,
-      amount,
-      platform_fee:   platformFee,
-      currency,
-      payment_gateway: paymentGateway,
-      status,
-      paid_at:        paidAt ? new Date(paidAt) : new Date()
+    // 4) Create records inside a DB transaction to keep consistency
+    const result = await sequelize.transaction(async (t) => {
+      const tx = await Transaction.create({
+        transaction_id: transactionId,
+        customer_id:    customer.customer_id,
+        job_id:         jobId,
+        amount,
+        platform_fee:   platformFee,
+        currency,
+        payment_gateway: paymentGateway,
+        status,
+        paid_at:        paidAt ? new Date(paidAt) : new Date()
+      }, { transaction: t });
+        
+
+      if (voucher_code) {
+        const v = await Voucher.findOne({
+          where: { voucher_code, expiry_date: { [Op.gt]: new Date() } },
+          transaction: t,
+        });
+        if (v) {
+          if (transactionId) {
+            await VoucherUsage.create({ voucher_id: v.voucher_id, transaction_id: transactionId }, { transaction: t });
+          }
+          v.used_count = (v.used_count || 0) + 1;
+          await v.save({ transaction: t });
+        }
+      }
+
+      return tx;
     });
 
-    return res.status(201).json(tx);
+    return res.status(201).json(result);
   } catch (err) {
     console.error('❌ createTransaction error:', err);
     return res.status(500).json({ error: err.message });

@@ -29,6 +29,10 @@ const Voucher = sequelize.define('Voucher', {
     type: DataTypes.TEXT,
     allowNull: true
   },
+  used_count: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0
+  },
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW

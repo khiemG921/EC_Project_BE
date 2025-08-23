@@ -5,7 +5,8 @@ const Job = require('./job');
 const Transaction = sequelize.define('Transaction', {
   transaction_id: {
     type: DataTypes.STRING(100),
-    allowNull: true
+    allowNull: true,
+    primaryKey: true 
   },
   customer_id: {
     type: DataTypes.INTEGER,
