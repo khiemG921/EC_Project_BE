@@ -3,8 +3,7 @@ const Customer = require("../models/customer");
 const transporter = require("../config/nodemailer");
 const crypto = require("crypto");
 
-// Simple in-memory store for verification codes (email: { code, expires, verified })
-const codeStore = new Map();
+const codeStore = require('../utils/codeStore');
 
 const registerUser = async (req, res) => {
   const { email, password, name, phone } = req.body;
@@ -12,13 +11,14 @@ const registerUser = async (req, res) => {
   try {
     // 1. Tạo user trên Firebase
     const user = await admin.auth().createUser({ email, password });
-    // 2. Set role mặc định là "customer"
-    await admin.auth().setCustomUserClaims(user.uid, { role: "customer" });
+  // 2. Set roles mặc định là ["customer"]
+  await admin.auth().setCustomUserClaims(user.uid, { roles: ["customer"] });
 
     // 3. Sinh mã xác thực 6 số
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expires = Date.now() + 120 * 1000; // 2 phút
-    codeStore.set(email, { code, expires, verified: false, name, phone });
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expires = Date.now() + 120 * 1000; // 2 phút
+  // Store a compact object. When using Redis TTL handles expiry, but we still store expires for debugging.
+  await codeStore.set(`otp:${email}`, { code, expires, verified: false, name, phone }, 120);
 
     // 4. Gửi email mã xác thực
     console.log("Sending email with config:", {
@@ -72,9 +72,9 @@ const registerUser = async (req, res) => {
         console.log("Email already exists, sending OTP for verification:", email);
         
         // Sinh mã xác thực 6 số cho user đã tồn tại
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
-        const expires = Date.now() + 120 * 1000; // 2 phút
-        codeStore.set(email, { code, expires, verified: false, name, phone, existingUid: existingUser.uid });
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expires = Date.now() + 120 * 1000; // 2 phút
+  await codeStore.set(`otp:${email}`, { code, expires, verified: false, name, phone, existingUid: existingUser.uid }, 120);
 
         // Gửi email mã xác thực
         console.log("Sending OTP email for existing user:", {
@@ -132,13 +132,12 @@ const registerUser = async (req, res) => {
 // API xác thực mã (verify code)
 const verifyRegisterCode = async (req, res) => {
   const { email, code } = req.body;
-  const entry = codeStore.get(email);
-  
+  const entry = await codeStore.get(`otp:${email}`);
   if (!entry || entry.code !== code) {
     return res.status(400).json({ message: "Mã xác thực không đúng." });
   }
-  
   if (Date.now() > entry.expires) {
+    await codeStore.del(`otp:${email}`).catch(() => {});
     return res.status(400).json({ message: "Mã đã hết hạn." });
   }
 
@@ -177,8 +176,8 @@ const verifyRegisterCode = async (req, res) => {
       await customer.save();
     }
 
-    // Mark as verified and cleanup
-    codeStore.delete(email);
+  // Mark as verified and cleanup
+  await codeStore.del(`otp:${email}`).catch(() => {});
     
     res.json({ 
       message: "Xác thực thành công.",
@@ -191,23 +190,22 @@ const verifyRegisterCode = async (req, res) => {
     res.status(500).json({ message: "Lỗi xác thực" });
   }
 };
+
 const becomeTasker = async (req, res) => {
   const { uid } = req.body;
 
   try {
     const userRecord = await admin.auth().getUser(uid);
     let roles = [];
-    if (userRecord.customClaims && Array.isArray(userRecord.customClaims.roles)) {
-      roles = userRecord.customClaims.roles;
-    }
+      if (userRecord.customClaims && Array.isArray(userRecord.customClaims.roles)) {
+        roles = userRecord.customClaims.roles;
+      }
 
-    if (!roles.includes('tasker')) {
-      roles.push('tasker');
-    }
+      if (!roles.includes('tasker')) {
+        roles.push('tasker');
+      }
 
-    await admin.auth().setCustomUserClaims(uid, {
-      roles
-    });
+      await admin.auth().setCustomUserClaims(uid, { roles });
 
     res.json({
       message: "Đã trở thành tasker",
@@ -376,7 +374,6 @@ const completeRegistration = async (req, res) => {
   try {
     console.log('Completing registration for Firebase user:', firebaseUid);
     
-    // Verify ID token from Authorization header
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Missing or invalid authorization token' });

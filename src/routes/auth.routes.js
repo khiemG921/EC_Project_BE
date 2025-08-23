@@ -38,10 +38,13 @@ router.post("/session", (req, res) => {
   console.log("[DEBUG] Backend received idToken:", idToken);
   console.log("Received idToken for session:", idToken ? "Token received" : "No token");
 
+  const isProd = process.env.NODE_ENV === 'production';
+
   res.cookie("token", idToken, {
     httpOnly: true,
-    secure: true,
-    sameSite: "None",
+    secure: !!isProd, // only secure on production (https)
+    sameSite: isProd ? "None" : "Lax", // cross-site cookie needs None+Secure in prod
+    path: '/',
     maxAge: 60 * 60 * 1000, // 1 giờ
   });
 
@@ -50,7 +53,14 @@ router.post("/session", (req, res) => {
 
 // Xóa session (logout)
 router.delete("/session", (req, res) => {
-  res.cookie("token", "", { maxAge: 0 });
+  const isProd = process.env.NODE_ENV === 'production';
+  res.cookie("token", "", {
+    httpOnly: true,
+    secure: !!isProd,
+    sameSite: isProd ? "None" : "Lax",
+    path: '/',
+    maxAge: 0,
+  });
   res.json({ message: "Đã đăng xuất" });
 });
 

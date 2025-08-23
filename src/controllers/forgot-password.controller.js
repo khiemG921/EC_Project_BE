@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const codeStore = new Map(); // { email: { code, expires, verified, token } }
+const codeStore = require('../utils/codeStore');
 const transporter = require('../config/nodemailer');
 const admin = require("../config/firebase");
 
@@ -11,7 +11,7 @@ async function sendResetCode(req, res) {
   // Sinh code 6 số
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const expires = Date.now() + 120 * 1000; // 2 phút
-  codeStore.set(email, { code, expires, verified: false });
+  await codeStore.set(`pw:${email}`, { code, expires, verified: false }, 120);
   console.log(`[ForgotPassword] Generated code: ${code}, expires at: ${new Date(expires).toISOString()}`);
   console.log('[ForgotPassword] Transporter config:', transporter.options || transporter);
   try {
@@ -54,26 +54,29 @@ async function sendResetCode(req, res) {
 // Xác thực code
 async function verifyResetCode(req, res) {
   const { email, code } = req.body;
-  const entry = codeStore.get(email);
+  const entry = await codeStore.get(`pw:${email}`);
   if (!entry || entry.code !== code) return res.status(400).json({ message: "Mã xác thực không đúng." });
-  if (Date.now() > entry.expires) return res.status(400).json({ message: "Mã đã hết hạn." });
+  if (Date.now() > entry.expires) {
+    await codeStore.del(`pw:${email}`).catch(() => {});
+    return res.status(400).json({ message: "Mã đã hết hạn." });
+  }
 
   // Sinh token tạm thời (random string)
   const token = crypto.randomBytes(32).toString('hex');
-  codeStore.set(email, { ...entry, verified: true, token });
+  await codeStore.set(`pw:${email}`, { ...entry, verified: true, token }, 300); // token valid for 5 minutes
   res.json({ token });
 }
 
 // Đổi mật khẩu
 async function resetPassword(req, res) {
   const { email, token, password } = req.body;
-  const entry = codeStore.get(email);
+  const entry = await codeStore.get(`pw:${email}`);
   if (!entry || !entry.verified || entry.token !== token) return res.status(400).json({ message: "Token không hợp lệ." });
   try {
     // Tìm user theo email
     const user = (await admin.auth().getUserByEmail(email));
     await admin.auth().updateUser(user.uid, { password });
-    codeStore.delete(email);
+  await codeStore.del(`pw:${email}`).catch(() => {});
     res.json({ message: "Đổi mật khẩu thành công." });
   } catch (err) {
     console.error("Reset password error:", err);

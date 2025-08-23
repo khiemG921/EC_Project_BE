@@ -5,6 +5,9 @@ const { QueryTypes } = require('sequelize');
 
 const createJob = async (req, res) => {
     try {
+        console.log('createJob: incoming request body:', JSON.stringify(req.body));
+        console.log('createJob: req.user:', req.user ? { fid: req.user.uid } : req.user);
+
         // Lấy Firebase UID từ middleware
         const firebaseUid = req.user?.uid;
         if (!firebaseUid) {
@@ -14,6 +17,8 @@ const createJob = async (req, res) => {
         const customer = await Customer.findOne({
             where: { firebase_id: firebaseUid },
         });
+
+        console.log('createJob: found customer:', customer ? { id: customer.customer_id } : 'not found');
         if (!customer) {
             return res
                 .status(404)
@@ -36,7 +41,9 @@ const createJob = async (req, res) => {
         return res.status(201).json(job);
     } catch (err) {
         console.error('❌ createJob error:', err);
-        return res.status(500).json({ error: err.message });
+        console.error('createJob: req.body (on error):', JSON.stringify(req.body));
+        console.error('createJob: req.user (on error):', req.user);
+        return res.status(500).json({ error: err.message || 'Internal server error' });
     }
 };
 

@@ -17,8 +17,17 @@ const sequelize = require('./src/config/db');
 const app = express();
 
 // ============== MIDDLEWARES ==============
+// Parse CORS_ORIGIN safely. If missing, allow localhost dev defaults but warn.
+let corsOrigin = [];
+if (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN.trim() !== '') {
+  corsOrigin = process.env.CORS_ORIGIN.split(',').map(s => s.trim());
+} else {
+  corsOrigin = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+  console.warn('CORS_ORIGIN not set. Defaulting to localhost origins for development. Set CORS_ORIGIN in env for production.');
+}
+
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN.split(','),
+  origin: corsOrigin,
   credentials: true,
   methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','Authorization'],
