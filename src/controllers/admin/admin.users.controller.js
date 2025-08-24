@@ -5,6 +5,7 @@ const adminAuth = require('../../config/firebase.js');
 const getAllUser = async (req, res) => {
     try {
         const users = await Customer.findAll({
+            where: { active: true },
             include: [{ model: Location, required: false }]
         });
 
@@ -243,22 +244,11 @@ const deleteUser = async (req, res) => {
             return res.status(400).json({ error: 'Không thể tự xóa tài khoản của chính bạn' });
         }
 
-        // Remove dependent locations first to avoid FK constraint issues
         try {
             await Location.destroy({ where: { customer_id: userId } });
-        } catch (e) {
-            console.warn('Failed to remove dependent locations for user', userId, e?.message);
-        }
-
-        const deletedRows = await Customer.destroy({
-            where: { customer_id: userId }
-        });
-        
-        if (deletedRows === 0) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-        
-        res.status(200).json({ message: 'User deleted successfully' });
+        } catch {}
+        await target.update({ active: false });
+        return res.status(200).json({ message: 'User deactivated successfully' });
     } catch (error) {
         console.error('Error deleting user:', error);
         res.status(500).json({ error: 'Internal server error' });
