@@ -14,11 +14,11 @@ const Review = sequelize.define('Review', {
   },
   job_id: {
     type: DataTypes.INTEGER,
-    allowNull: false
+  allowNull: true
   },
   service_id: {                               
     type: DataTypes.INTEGER,
-    allowNull: false
+  allowNull: true
   },
   type: DataTypes.TEXT,
   rating_job: {
