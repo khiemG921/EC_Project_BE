@@ -221,6 +221,15 @@ const becomeTasker = async (req, res) => {
 
 // Verify token và trả về thông tin user đầy đủ
 const verifyUserToken = async (req, res) => {
+  try {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.set('Surrogate-Control', 'no-store');
+    res.vary('Authorization');
+  // Prevent conditional GET 304 by emitting a unique ETag each time
+  res.set('ETag', Date.now().toString());
+  } catch (e) {}
   // Ưu tiên Authorization header trước, sau đó mới đến cookie 
   const headerToken = req.headers.authorization?.split(' ')[1];
   const cookieToken = req.cookies.token;
@@ -276,7 +285,8 @@ const verifyUserToken = async (req, res) => {
       ? (raw.Locations[0]?.detail || '')
       : '';
 
-    res.json({
+  // Always return a fresh JSON body (no 304) so clients don’t rely on cached verify
+  return res.status(200).json({
       valid: true,
       user: {
         id: customer.customer_id.toString(),
