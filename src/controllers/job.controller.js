@@ -211,6 +211,39 @@ const confirmJobCustomer = async (req, res) => {
         job.customer_confirmation = 1;
         await job.save();
 
+        // Cập nhật thông tin giao dịch
+        const transaction = await Transaction.findOne({
+            where: { job_id: jobId },
+            attributes: ['amount', 'platform_fee', 'currency'],
+        });
+
+        amount = transaction.amount + transaction.platform_fee;
+
+        if (transaction.currency === 'USD') {
+            // Xử lý cho giao dịch bằng USD
+            const exKey = process.env.EXCHANGE_RATE_API_KEY;
+            const rateRes = await fetch(
+                `https://v6.exchangerate-api.com/v6/${exKey}/pair/USD/VND`
+            );
+            const rateData = await rateRes.json();
+            const vndPerUsd = rateData.conversion_rate;
+            const amount = (amount * vndPerUsd).toFixed(2);
+        }
+
+        let commission; // Mặc định là 10%
+        if (service_id === 1 || service_id === 2) {
+            commission = 0.15 * amount;
+        } else if (service_id === 4 || service_id === 5 || service_id === 8) {
+            commission = 0.2 * amount;
+        } else {
+            commission = 0.1 * amount;
+        }
+
+        await Customer.increment(
+            { reward_points: commission },
+            { where: { customer_id: job.tasker_id } }
+        );
+
         return res.json({ message: `Công việc #${jobId} đã được khách hàng xác nhận.` });
     } catch (error) {
         console.error('confirmJobCustomer error:', error);
