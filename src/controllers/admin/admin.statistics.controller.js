@@ -20,6 +20,8 @@ const countUsers = async (req, res) => {
 
     activeUsers = totalUsers > 0 ? totalUsers : 0;
     }
+    // active=true được cập nhật khi user đăng nhập (POST /api/auth/session)
+    // và đặt false khi logout (DELETE /api/auth/session)
     
     return res.json({
         totalUsers,
