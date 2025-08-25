@@ -152,10 +152,6 @@ const countPendingJobsCustomer = async (req, res) => {
                 .json({ error: 'Không tìm thấy khách hàng!' });
         }
 
-        console.log(
-            'Count pending jobs for customer_id:',
-            customer.customer_id
-        );
         const count = await Job.count({
             where: {
                 customer_id: customer.customer_id,
@@ -176,9 +172,80 @@ const countPendingJobsCustomer = async (req, res) => {
     }
 };
 
+const completeJobTasker = async (req, res) => {
+    try {
+        const jobId = req.params.id;
+        const job = await Job.findByPk(jobId);
+        if (!job) {
+            return res.status(404).json({ error: 'Không tìm thấy công việc' });
+        }
+
+        // Chỉ cho phép hoàn thành nếu job đang ở trạng thái 'in_progress'
+        if (job.status !== 'in_progress') {
+            return res
+                .status(400)
+                .json({ error: 'Chỉ có thể hoàn thành công việc đang tiến hành' });
+        }
+
+        // Cập nhật trạng thái job
+        job.completed_at = new Date();
+        await job.save();
+
+        return res.json({ message: `Công việc #${jobId} đã được tasker hoàn thành.` });
+    } catch (error) {
+        console.error('completeJobTasker error:', error);
+        return res.status(500).json({ error: error.message });
+    }
+}
+
+const confirmJobCustomer = async (req, res) => {
+    try {
+        const jobId = req.params.id;
+        const job = await Job.findByPk(jobId);
+        if (!job) {
+            return res.status(404).json({ error: 'Không tìm thấy công việc' });
+        }
+
+        // Chỉ cho phép xác nhận nếu job đang ở trạng thái 'completed'
+        if (job.status !== 'completed') {
+            return res
+                .status(400)
+                .json({ error: 'Chỉ có thể xác nhận công việc đã hoàn thành' });
+        }
+
+        // Cập nhật trạng thái job
+        job.status = 'completed';
+        job.customer_confirmation = true;
+        await job.save();
+
+        return res.json({ message: `Công việc #${jobId} đã được khách hàng xác nhận.` });
+    } catch (error) {
+        console.error('confirmJobCustomer error:', error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+const jobStatus = async (req, res) => {
+    try {
+        const jobId = req.params.id;
+        const job = await Job.findByPk(jobId);
+        if (!job) {
+            return res.status(404).json({ error: 'Không tìm thấy công việc' });
+        }
+
+        return res.json({ status: job.status });
+    } catch (error) {
+        console.error('jobStatus error:', error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     createJob,
     loadJobs,
     cancelJob,
+    jobStatus,
+    completeJobTasker,
+    confirmJobCustomer,
     countPendingJobsCustomer,
 };
