@@ -231,9 +231,9 @@ const confirmJobCustomer = async (req, res) => {
         }
 
         let commission; // Mặc định là 10%
-        if (service_id === 1 || service_id === 2) {
+        if (job.service_id === 1 || job.service_id === 2) {
             commission = 0.15 * amount;
-        } else if (service_id === 4 || service_id === 5 || service_id === 8) {
+        } else if (job.service_id === 4 || job.service_id === 5 || job.service_id === 8) {
             commission = 0.2 * amount;
         } else {
             commission = 0.1 * amount;
