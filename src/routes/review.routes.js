@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Review = require('../models/review');
 const Customer = require('../models/customer');
+const { verifyToken } = require('../middleware/auth.middle');
 
 // GET /api/reviews — Lấy tất cả reviews
 router.get('/', async (req, res) => {
@@ -21,11 +22,18 @@ router.get('/', async (req, res) => {
   }
 });
 // Tạo review mới
-router.post('/', async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   try {
     const { customer_id, job_id, service_id, type, rating_job, rating_tasker, detail } = req.body || {};
-    // Coerce types
-    const cid = Number(customer_id);
+    // Coerce types; if no customer_id in body, try from authenticated user
+    let cid = Number(customer_id);
+    if (!Number.isFinite(cid) || cid <= 0) {
+      const uid = req.user?.uid;
+      if (uid) {
+        const found = await Customer.findOne({ where: { firebase_id: uid } });
+        if (found) cid = Number(found.customer_id);
+      }
+    }
     const jid = job_id == null || job_id === '' ? null : Number(job_id);
     const sid = service_id == null || service_id === '' ? null : Number(service_id);
     const rj = Number(rating_job);
@@ -62,6 +70,14 @@ router.post('/', async (req, res) => {
     // Detect FK error to job when provided but not valid
     if (err?.name === 'SequelizeForeignKeyConstraintError' && err?.index?.includes('fk_review_job')) {
       return res.status(400).json({ message: 'job_id không hợp lệ hoặc không tồn tại', code: 'FK_JOB' });
+    }
+    // Detect NOT NULL error on job_id column (DB schema not migrated)
+    if (err?.original?.sqlMessage && /job_id.*cannot be null/i.test(err.original.sqlMessage)) {
+      return res.status(500).json({
+        message: 'Đã có lỗi xảy ra khi tạo review',
+        hint: 'Cột job_id đang NOT NULL trong database. Hãy ALTER TABLE review MODIFY job_id INT NULL hoặc DROP/đặt FK ON DELETE SET NULL.',
+        error: err?.original?.sqlMessage
+      });
     }
     return res.status(500).json({ message: 'Đã có lỗi xảy ra khi tạo review', error: err?.message || String(err) });
   }
