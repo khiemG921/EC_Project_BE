@@ -206,13 +206,6 @@ const confirmJobCustomer = async (req, res) => {
             return res.status(404).json({ error: 'Không tìm thấy công việc' });
         }
 
-        // Chỉ cho phép xác nhận nếu job đang ở trạng thái 'completed'
-        if (job.status !== 'completed') {
-            return res
-                .status(400)
-                .json({ error: 'Chỉ có thể xác nhận công việc đã hoàn thành' });
-        }
-
         // Cập nhật trạng thái job
         job.status = 'completed';
         job.customer_confirmation = 1;
