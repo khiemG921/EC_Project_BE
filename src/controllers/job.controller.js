@@ -215,7 +215,7 @@ const confirmJobCustomer = async (req, res) => {
 
         // Cập nhật trạng thái job
         job.status = 'completed';
-        job.customer_confirmation = true;
+        job.customer_confirmation = 1;
         await job.save();
 
         return res.json({ message: `Công việc #${jobId} đã được khách hàng xác nhận.` });
