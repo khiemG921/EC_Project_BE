@@ -24,23 +24,35 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { customer_id, job_id, service_id, type, rating_job, rating_tasker, detail } = req.body || {};
+    // Coerce types
+    const cid = Number(customer_id);
+    const jid = job_id == null || job_id === '' ? null : Number(job_id);
+    const sid = service_id == null || service_id === '' ? null : Number(service_id);
+    const rj = Number(rating_job);
+    const rt = rating_tasker == null || rating_tasker === '' ? rj : Number(rating_tasker);
 
-    if (!customer_id || typeof rating_job !== 'number') {
-      return res.status(400).json({ message: 'Thiếu customer_id hoặc rating_job không hợp lệ' });
+    if (!Number.isFinite(cid) || cid <= 0) {
+      return res.status(400).json({ message: 'customer_id không hợp lệ' });
+    }
+    if (!Number.isFinite(rj) || rj < 1 || rj > 5) {
+      return res.status(400).json({ message: 'rating_job phải là số từ 1 đến 5' });
+    }
+    if (!Number.isFinite(rt) || rt < 1 || rt > 5) {
+      return res.status(400).json({ message: 'rating_tasker phải là số từ 1 đến 5' });
     }
 
     // Validate customer exists (avoid FK surprises)
-    const customer = await Customer.findByPk(customer_id);
+    const customer = await Customer.findByPk(cid);
     if (!customer) return res.status(400).json({ message: 'customer_id không tồn tại' });
 
     const payload = {
-      customer_id,
-      job_id: job_id || null, // allow public reviews without job
-      service_id: service_id ?? null, // can be null for legacy/public, but FE should send when known
+      customer_id: cid,
+      job_id: jid, // allow public reviews without job
+      service_id: sid, // can be null for legacy/public, but FE should send when known
       type: type || null,
-      rating_job: rating_job,
-      rating_tasker: typeof rating_tasker === 'number' ? rating_tasker : rating_job,
-      detail: detail || '',
+      rating_job: rj,
+      rating_tasker: rt,
+      detail: String(detail || '').slice(0, 2000),
     };
 
     const newReview = await Review.create(payload);
