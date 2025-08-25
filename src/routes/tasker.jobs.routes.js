@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const verifyToken = require('../middleware/auth.middle').verifyToken;
+const { verifyToken } = require('../middleware/auth.middle');
 const { listJobsByCity, acceptJob, getJobDetail, getTaskerRegulations, requestCancelJob } = require('../controllers/tasker.jobs.controller');
 
 router.use(verifyToken);

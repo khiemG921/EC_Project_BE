@@ -1,8 +1,8 @@
 const express = require('express');
 const router  = express.Router();
-const verifySession      = require('../middleware/auth.middle').verifyToken;
+const { verifyToken } = require('../middleware/auth.middle');
 const { createTransaction } = require('../controllers/transaction.controller');
 
-router.post('/transaction/create', verifySession, createTransaction);
+router.post('/transaction/create', verifyToken, createTransaction);
 
 module.exports = router;

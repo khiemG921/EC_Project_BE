@@ -1,5 +1,4 @@
 const express = require('express');
-const verifySession = require('../middleware/auth.middle').verifyToken; // hoặc verifyToken
 const { createPaypalOrder, capturePaypalOrder, createMoMoOrder, createZaloPayOrder } = require('../controllers/payment.controller');
 const { verifyToken } = require('../middleware/auth.middle');
 

@@ -1,6 +1,6 @@
 const express = require('express');
 const { findCustomer, updateCustomerProfile, updateCustomerImage } = require('../controllers/profile.controler.js');
-const verifyToken = require('../middleware/auth.middle').verifyToken;
+const { verifyToken } = require('../middleware/auth.middle');
 const upload = require('../middleware/multer.js');
 
 const router = express.Router();

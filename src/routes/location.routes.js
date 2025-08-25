@@ -1,5 +1,5 @@
 const express = require('express');
-const verifyToken = require('../middleware/auth.middle').verifyToken;
+const { verifyToken } = require('../middleware/auth.middle');
 const { createLocation, getLocation, autocompleteLocation, reverseGeocoding, forwardGeocoding } = require('../controllers/location.controller');
 // const auth = require('../middleware/auth');  // middleware gán req.user
 const router = express.Router();
