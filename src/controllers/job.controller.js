@@ -130,8 +130,38 @@ const cancelJob = async (req, res) => {
     }
 };
 
+const countPendingJobsCustomer = async (req, res) => {
+    try {
+        const firebaseUid = req.user?.uid;
+        if (!firebaseUid) {
+            return res.status(401).json({ error: 'Chưa đăng nhập!' });
+        }
+        const customer = await Customer.findOne({
+            where: { firebase_id: firebaseUid },
+        });
+        if (!customer) {
+            return res
+                .status(404)
+                .json({ error: 'Không tìm thấy khách hàng!' });
+        }
+
+        const count = await Job.count({
+            where: {
+                customer_id: customer.customer_id,
+                status: 'pending',
+            },
+        });
+
+        return res.json({ count });
+    } catch (error) {
+        console.error('countPendingJobsCustomer error:', error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     createJob,
     loadJobs,
     cancelJob,
+    countPendingJobsCustomer,
 };
