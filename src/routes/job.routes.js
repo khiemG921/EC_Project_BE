@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const {verifyToken} = require('../middleware/auth.middle');  // hoặc verifyToken
-const { createJob, loadJobs, jobStatus, cancelJob, countPendingJobsCustomer, completeJobTasker, confirmJobCustomer } = require('../controllers/job.controller');
+const { createJob, loadJobs, jobStatus, cancelJob, countCurrentJobsCustomer, completeJobTasker, confirmJobCustomer } = require('../controllers/job.controller');
 
 router.get('/job/status/:id', jobStatus);
 router.get('/job/load', verifyToken, loadJobs);
-router.get('/job/customer/count-pending', verifyToken, countPendingJobsCustomer);
+router.get('/job/customer/count-pending', verifyToken, countCurrentJobsCustomer);
 
 router.post('/job/cancel/:id', cancelJob);
 router.post('/job/create', verifyToken, createJob);

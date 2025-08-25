@@ -137,7 +137,7 @@ const cancelJob = async (req, res) => {
     }
 };
 
-const countPendingJobsCustomer = async (req, res) => {
+const countCurrentJobsCustomer = async (req, res) => {
     try {
         const firebaseUid = req.user?.uid;
         if (!firebaseUid) {
@@ -155,7 +155,7 @@ const countPendingJobsCustomer = async (req, res) => {
         const count = await Job.count({
             where: {
                 customer_id: customer.customer_id,
-                status: 'pending',
+                status: ['pending', 'in_progress'],
             },
             include: [
                 {
@@ -247,5 +247,5 @@ module.exports = {
     jobStatus,
     completeJobTasker,
     confirmJobCustomer,
-    countPendingJobsCustomer,
+    countCurrentJobsCustomer,
 };
