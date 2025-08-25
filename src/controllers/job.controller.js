@@ -145,6 +145,7 @@ const countPendingJobsCustomer = async (req, res) => {
                 .json({ error: 'Không tìm thấy khách hàng!' });
         }
 
+        console.log('Count pending jobs for customer_id:', customer.customer_id);
         const count = await Job.count({
             where: {
                 customer_id: customer.customer_id,
