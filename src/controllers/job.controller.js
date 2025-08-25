@@ -1,5 +1,6 @@
 const Job = require('../models/job');
 const Customer = require('../models/customer');
+const Transaction = require('../models/transaction');
 const sequelize = require('../config/db');
 const { QueryTypes } = require('sequelize');
 
@@ -21,7 +22,13 @@ const createJob = async (req, res) => {
         }
 
         // Lấy payload từ body
-        const { serviceId, serviceDetailId, location, description, totalDuration } = req.body;
+        const {
+            serviceId,
+            serviceDetailId,
+            location,
+            description,
+            totalDuration,
+        } = req.body;
 
         // Tạo record mới
         const job = await Job.create({
@@ -145,12 +152,21 @@ const countPendingJobsCustomer = async (req, res) => {
                 .json({ error: 'Không tìm thấy khách hàng!' });
         }
 
-        console.log('Count pending jobs for customer_id:', customer.customer_id);
+        console.log(
+            'Count pending jobs for customer_id:',
+            customer.customer_id
+        );
         const count = await Job.count({
             where: {
                 customer_id: customer.customer_id,
                 status: 'pending',
             },
+            include: [
+                {
+                    model: Transaction,
+                    required: true,
+                },
+            ],
         });
 
         return res.json({ count });
