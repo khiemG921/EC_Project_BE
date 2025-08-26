@@ -184,19 +184,23 @@ const completeJobTasker = async (req, res) => {
         if (job.status !== 'in_progress') {
             return res
                 .status(400)
-                .json({ error: 'Chỉ có thể hoàn thành công việc đang tiến hành' });
+                .json({
+                    error: 'Chỉ có thể hoàn thành công việc đang tiến hành',
+                });
         }
 
         // Cập nhật trạng thái job
         job.completed_at = new Date();
         await job.save();
 
-        return res.json({ message: `Công việc #${jobId} đã được tasker hoàn thành.` });
+        return res.json({
+            message: `Công việc #${jobId} đã được tasker hoàn thành.`,
+        });
     } catch (error) {
         console.error('completeJobTasker error:', error);
         return res.status(500).json({ error: error.message });
     }
-}
+};
 
 const confirmJobCustomer = async (req, res) => {
     try {
@@ -233,18 +237,32 @@ const confirmJobCustomer = async (req, res) => {
         let commission; // Mặc định là 10%
         if (job.service_id === 1 || job.service_id === 2) {
             commission = 0.15 * amount;
-        } else if (job.service_id === 4 || job.service_id === 5 || job.service_id === 8) {
+        } else if (
+            job.service_id === 4 ||
+            job.service_id === 5 ||
+            job.service_id === 8
+        ) {
             commission = 0.2 * amount;
         } else {
             commission = 0.1 * amount;
         }
 
+        const taskerData = await sequelize.query(
+            `SELECT t.firebase_id FROM job j
+             JOIN tasker t ON j.tasker_id = t.tasker_id
+             WHERE j.job_id = :jobId`,
+            { replacements: { jobId }, type: QueryTypes.SELECT }
+        );
+        const taskerFirebaseId = taskerData[0]?.firebase_id;
+
         await Customer.increment(
             { reward_points: commission },
-            { where: { customer_id: job.tasker_id } }
+            { where: { firebase_id: taskerFirebaseId } }
         );
 
-        return res.json({ message: `Công việc #${jobId} đã được khách hàng xác nhận.` });
+        return res.json({
+            message: `Công việc #${jobId} đã được khách hàng xác nhận.`,
+        });
     } catch (error) {
         console.error('confirmJobCustomer error:', error);
         return res.status(500).json({ error: error.message });
