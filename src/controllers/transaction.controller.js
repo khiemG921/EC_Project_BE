@@ -65,6 +65,12 @@ const createTransaction = async (req, res) => {
         }
       }
 
+      if (cleanCoinUsed && cleanCoinUsed > 0) {
+        customer.clean_coins = (customer.clean_coins || 0) - cleanCoinUsed;
+        if (customer.clean_coins < 0) customer.clean_coins = 0;
+        await customer.save({ transaction: t });
+      }
+
       return tx;
     });
 
