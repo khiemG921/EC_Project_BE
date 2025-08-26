@@ -247,7 +247,7 @@ const verifyUserToken = async (req, res) => {
   }
 
   try {
-  const decodedToken = await admin.auth().verifyIdToken(token);
+    const decodedToken = await admin.auth().verifyIdToken(token);
     console.log('Token decoded successfully:', {
       uid: decodedToken.uid,
       email: decodedToken.email,
