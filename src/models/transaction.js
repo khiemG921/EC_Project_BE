@@ -45,6 +45,11 @@ const Transaction = sequelize.define('Transaction', {
     type: DataTypes.DATE,
     allowNull: true,
     defaultValue: null
+  },
+  clean_coins: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+    defaultValue: 0
   }
 }, {
   tableName: 'transaction',
