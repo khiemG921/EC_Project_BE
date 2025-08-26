@@ -66,8 +66,8 @@ const createTransaction = async (req, res) => {
       }
 
       if (cleanCoinUsed && cleanCoinUsed > 0) {
-        customer.clean_coins = (customer.clean_coins || 0) - cleanCoinUsed;
-        if (customer.clean_coins < 0) customer.clean_coins = 0;
+        customer.reward_points = (customer.reward_points || 0) - cleanCoinUsed;
+        if (customer.reward_points < 0) customer.reward_points = 0;
         await customer.save({ transaction: t });
       }
 
