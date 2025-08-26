@@ -137,7 +137,7 @@ const cancelJob = async (req, res) => {
     }
 };
 
-const countPendingJobsCustomer = async (req, res) => {
+const countCurrentJobsCustomer = async (req, res) => {
     try {
         const firebaseUid = req.user?.uid;
         if (!firebaseUid) {
@@ -152,14 +152,10 @@ const countPendingJobsCustomer = async (req, res) => {
                 .json({ error: 'Không tìm thấy khách hàng!' });
         }
 
-        console.log(
-            'Count pending jobs for customer_id:',
-            customer.customer_id
-        );
         const count = await Job.count({
             where: {
                 customer_id: customer.customer_id,
-                status: 'pending',
+                status: ['pending', 'in_progress'],
             },
             include: [
                 {
@@ -176,9 +172,126 @@ const countPendingJobsCustomer = async (req, res) => {
     }
 };
 
+const completeJobTasker = async (req, res) => {
+    try {
+        const jobId = req.params.id;
+        const job = await Job.findByPk(jobId);
+        if (!job) {
+            return res.status(404).json({ error: 'Không tìm thấy công việc' });
+        }
+
+        // Chỉ cho phép hoàn thành nếu job đang ở trạng thái 'in_progress'
+        if (job.status !== 'in_progress') {
+            return res
+                .status(400)
+                .json({
+                    error: 'Chỉ có thể hoàn thành công việc đang tiến hành',
+                });
+        }
+
+        // Cập nhật trạng thái job
+        job.completed_at = new Date();
+        await job.save();
+
+        return res.json({
+            message: `Công việc #${jobId} đã được tasker hoàn thành.`,
+        });
+    } catch (error) {
+        console.error('completeJobTasker error:', error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+const confirmJobCustomer = async (req, res) => {
+    try {
+        const jobId = req.params.id;
+        const job = await Job.findByPk(jobId);
+        if (!job) {
+            return res.status(404).json({ error: 'Không tìm thấy công việc' });
+        }
+
+        // Cập nhật trạng thái job
+        job.status = 'completed';
+        job.customer_confirmation = 1;
+        await job.save();
+
+        // Cập nhật thông tin giao dịch
+        const transaction = await Transaction.findOne({
+            where: { job_id: jobId },
+            attributes: ['amount', 'currency', 'clean_coins'],
+        });
+
+        let amount = transaction.amount;
+
+        if (transaction.currency === 'USD') {
+            // Xử lý cho giao dịch bằng USD
+            const exKey = process.env.EXCHANGE_RATE_API_KEY;
+            const rateRes = await fetch(
+                `https://v6.exchangerate-api.com/v6/${exKey}/pair/USD/VND`
+            );
+            const rateData = await rateRes.json();
+            const vndPerUsd = rateData.conversion_rate;
+            amount = (amount * vndPerUsd).toFixed(2);
+        }
+        amount = parseFloat(amount) + (transaction.clean_coins || 0);
+        
+        let commission; // Mặc định là 10%
+        if (job.service_id === 1 || job.service_id === 2) {
+            commission = 0.15 * amount;
+        } else if (
+            job.service_id === 4 ||
+            job.service_id === 5 ||
+            job.service_id === 8
+        ) {
+            commission = 0.2 * amount;
+        } else {
+            commission = 0.1 * amount;
+        }
+        console.log('Commission calculated:', commission);
+
+        const taskerData = await sequelize.query(
+            `SELECT t.firebase_id FROM job j
+             JOIN tasker t ON j.tasker_id = t.tasker_id
+             WHERE j.job_id = :jobId`,
+            { replacements: { jobId }, type: QueryTypes.SELECT }
+        );
+        const taskerFirebaseId = taskerData[0]?.firebase_id;
+
+        await Customer.increment(
+            { reward_points: commission },
+            { where: { firebase_id: taskerFirebaseId } }
+        );
+
+        return res.json({
+            message: `Công việc #${jobId} đã được khách hàng xác nhận.`,
+        });
+    } catch (error) {
+        console.error('confirmJobCustomer error:', error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+const jobStatus = async (req, res) => {
+    try {
+        const jobId = req.params.id;
+        const job = await Job.findByPk(jobId);
+        if (!job) {
+            return res.status(404).json({ error: 'Không tìm thấy công việc' });
+        }
+
+        return res.json({ status: job.status });
+    } catch (error) {
+        console.error('jobStatus error:', error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     createJob,
     loadJobs,
     cancelJob,
-    countPendingJobsCustomer,
+    jobStatus,
+    completeJobTasker,
+    confirmJobCustomer,
+    countCurrentJobsCustomer,
 };

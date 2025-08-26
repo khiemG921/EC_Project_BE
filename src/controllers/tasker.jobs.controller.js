@@ -61,11 +61,12 @@ async function getEstimatedEarnings(service_id, job_id) {
             where: {
                 job_id: job_id,
             },
-            attributes: ['amount'],
+            attributes: ['amount', 'clean_coins'],
         });
 
         const amountValue = transactionRecord && transactionRecord.amount ? parseFloat(transactionRecord.amount) : 0;
-        const earning = amountValue * parseFloat(commission);
+        const cleanCoinsValue = transactionRecord && transactionRecord.clean_coins ? parseFloat(transactionRecord.clean_coins) : 0;
+        const earning = (amountValue + cleanCoinsValue) * parseFloat(commission);
 
         if (isNaN(earning)) return 200000; // fallback to default earning
         return earning.toFixed(2);

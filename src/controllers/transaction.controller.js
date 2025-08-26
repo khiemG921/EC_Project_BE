@@ -31,7 +31,8 @@ const createTransaction = async (req, res) => {
       paymentGateway,
       status,
       paidAt,
-      voucher_code
+      voucher_code,
+      cleanCoinUsed
     } = req.body;
 
     // 4) Create records inside a DB transaction to keep consistency
@@ -45,7 +46,8 @@ const createTransaction = async (req, res) => {
         currency,
         payment_gateway: paymentGateway,
         status,
-        paid_at:        paidAt ? new Date(paidAt) : new Date()
+        paid_at:        paidAt ? new Date(paidAt) : new Date(),
+        clean_coins: cleanCoinUsed
       }, { transaction: t });
         
 
@@ -61,6 +63,12 @@ const createTransaction = async (req, res) => {
           v.used_count = (v.used_count || 0) + 1;
           await v.save({ transaction: t });
         }
+      }
+
+      if (cleanCoinUsed && cleanCoinUsed > 0) {
+        customer.reward_points = (customer.reward_points || 0) - cleanCoinUsed;
+        if (customer.reward_points < 0) customer.reward_points = 0;
+        await customer.save({ transaction: t });
       }
 
       return tx;

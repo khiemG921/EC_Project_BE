@@ -63,6 +63,11 @@ const Job = sequelize.define('Job', {
     allowNull: true,
     defaultValue: null
   },
+  customer_confirmation: {
+    type: DataTypes.BOOLEAN,
+    allowNull: true,
+    defaultValue: false
+  },
   noted: {
     type: DataTypes.TEXT,
     allowNull: true,
