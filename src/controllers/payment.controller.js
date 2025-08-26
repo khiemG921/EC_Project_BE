@@ -66,7 +66,7 @@ const createMoMoOrder = async (req, res) => {
             '&partnerCode=' + partnerCode +
             '&redirectUrl=' + redirectUrl +
             '&requestId=' + requestId +
-            '&requestType=' + 'payWithATM';
+            '&requestType=' + 'payWithMethod';
 
 
         const signature = crypto
@@ -85,7 +85,7 @@ const createMoMoOrder = async (req, res) => {
             redirectUrl : redirectUrl,
             ipnUrl : ipnUrl,
             lang : 'en',
-            requestType: 'payWithATM',
+            requestType: 'payWithMethod',
             autoCapture: true,
             extraData : extraData,
             orderGroupId: '',
