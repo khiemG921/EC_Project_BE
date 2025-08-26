@@ -221,7 +221,7 @@ const confirmJobCustomer = async (req, res) => {
             attributes: ['amount', 'platform_fee', 'currency'],
         });
 
-        amount = transaction.amount + transaction.platform_fee;
+        let amount = transaction.amount + transaction.platform_fee;
 
         if (transaction.currency === 'USD') {
             // Xử lý cho giao dịch bằng USD
@@ -231,7 +231,7 @@ const confirmJobCustomer = async (req, res) => {
             );
             const rateData = await rateRes.json();
             const vndPerUsd = rateData.conversion_rate;
-            const amount = (amount * vndPerUsd).toFixed(2);
+            amount = (amount * vndPerUsd).toFixed(2);
         }
 
         let commission; // Mặc định là 10%
