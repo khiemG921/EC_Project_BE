@@ -218,10 +218,10 @@ const confirmJobCustomer = async (req, res) => {
         // Cập nhật thông tin giao dịch
         const transaction = await Transaction.findOne({
             where: { job_id: jobId },
-            attributes: ['amount', 'platform_fee', 'currency'],
+            attributes: ['amount', 'currency', 'clean_coins'],
         });
 
-        let amount = transaction.amount + transaction.platform_fee;
+        let amount = transaction.amount;
 
         if (transaction.currency === 'USD') {
             // Xử lý cho giao dịch bằng USD
@@ -233,7 +233,8 @@ const confirmJobCustomer = async (req, res) => {
             const vndPerUsd = rateData.conversion_rate;
             amount = (amount * vndPerUsd).toFixed(2);
         }
-
+        amount = parseFloat(amount) + (transaction.clean_coins || 0);
+        
         let commission; // Mặc định là 10%
         if (job.service_id === 1 || job.service_id === 2) {
             commission = 0.15 * amount;
@@ -246,6 +247,7 @@ const confirmJobCustomer = async (req, res) => {
         } else {
             commission = 0.1 * amount;
         }
+        console.log('Commission calculated:', commission);
 
         const taskerData = await sequelize.query(
             `SELECT t.firebase_id FROM job j
