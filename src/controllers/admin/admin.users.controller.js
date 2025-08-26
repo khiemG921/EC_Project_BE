@@ -5,7 +5,6 @@ const adminAuth = require('../../config/firebase.js');
 const getAllUser = async (req, res) => {
     try {
         const users = await Customer.findAll({
-            where: { active: true },
             include: [{ model: Location, required: false }]
         });
 

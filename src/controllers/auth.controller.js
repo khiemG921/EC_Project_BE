@@ -247,14 +247,14 @@ const verifyUserToken = async (req, res) => {
   }
 
   try {
-    const decodedToken = await admin.auth().verifyIdToken(token);
+  const decodedToken = await admin.auth().verifyIdToken(token);
     console.log('Token decoded successfully:', {
       uid: decodedToken.uid,
       email: decodedToken.email,
       customClaims: decodedToken
     });
     
-    // Lấy thông tin customer từ database
+  // Lấy thông tin customer từ database
     const customer = await Customer.findOne({
       where: { firebase_id: decodedToken.uid },
       include: [{ model: Location, required: false }]
@@ -270,6 +270,14 @@ const verifyUserToken = async (req, res) => {
       name: customer.name,
       email: customer.email
     });
+
+    try {
+      if (customer && customer.active !== true) {
+        await customer.update({ active: true });
+      }
+    } catch (e) {
+      console.warn('[VERIFY] Failed to bump active flag:', e?.message || e);
+    }
 
     // Xử lý roles: ưu tiên customClaims.roles (array), fallback role (string), mặc định ['customer']
     let roles = ['customer'];

@@ -90,12 +90,16 @@ exports.listJobsByCity = async (req, res) => {
 
         const cityCode = toCityCode(req.query.city) || 'hcm';
 
-        // Lấy các job trạng thái pending hoặc đã nhận bởi tasker này (in_progress), lọc theo thành phố bằng so khớp địa chỉ
+    // Lấy các job trạng thái:
+    // - pending 
+    // - in_progress 
+    // - completed 
         const jobs = await Job.findAll({
             where: {
                 [Op.or]: [
                     { status: 'pending' },
-                    { status: 'in_progress', tasker_id: tasker.tasker_id },
+            { status: 'in_progress', tasker_id: tasker.tasker_id },
+            { status: 'completed', tasker_id: tasker.tasker_id },
                 ],
             },
             include: [{ model: Service, as: 'service' }],
@@ -197,12 +201,11 @@ exports.getJobDetail = async (req, res) => {
                 .json({ message: 'Không tìm thấy công việc' });
 
         const isAssignedToMe = job.tasker_id === tasker.tasker_id;
-        if (
-            !(
-                job.status === 'pending' ||
-                (job.status === 'in_progress' && isAssignedToMe)
-            )
-        ) {
+        if (!(
+            job.status === 'pending' ||
+            (job.status === 'in_progress' && isAssignedToMe) ||
+            (job.status === 'completed' && isAssignedToMe)
+        )) {
             return res
                 .status(403)
                 .json({
