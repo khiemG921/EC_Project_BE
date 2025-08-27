@@ -1,7 +1,7 @@
 const admin = require("../config/firebase");
 const Customer = require("../models/customer");
 const Location = require("../models/location");
-const transporter = require("../config/nodemailer");
+const mailer = require("../config/mailer");
 const crypto = require("crypto");
 
 const codeStore = new Map();
@@ -21,12 +21,9 @@ const registerUser = async (req, res) => {
     codeStore.set(email, { code, expires, verified: false, name, phone });
 
     // 4. Gửi email mã xác thực
-    console.log("Sending email with config:", {
-      user: process.env.AUTH_USER,
-      pass: process.env.AUTH_PASS ? "***SET***" : "NOT_SET"
-    });
+    console.log("Sending email to:", email);
     
-    await transporter.sendMail({
+    await mailer.sendMail({
       from: `"EC App" <${process.env.AUTH_USER}>`,
       to: email,
       subject: "EC App - Mã xác thực đăng ký tài khoản",
@@ -60,8 +57,8 @@ const registerUser = async (req, res) => {
       message: "Đăng ký thành công. Đã gửi mã xác thực về email.",
       needVerify: true
     });
-    console.log("User registered successfully:", user.uid);
-    console.log("Verification code sent to:", email, code);
+  console.log("User registered successfully:", user.uid);
+  console.log("Verification code generated for:", email, code);
   } catch (err) {
     console.error("Registration error:", err);
     
@@ -77,12 +74,9 @@ const registerUser = async (req, res) => {
         codeStore.set(email, { code, expires, verified: false, name, phone, existingUid: existingUser.uid });
 
         // Gửi email mã xác thực
-        console.log("Sending OTP email for existing user:", {
-          user: process.env.AUTH_USER,
-          pass: process.env.AUTH_PASS ? "***SET***" : "NOT_SET"
-        });
+        console.log("Sending OTP to existing user:", email);
         
-        await transporter.sendMail({
+        await mailer.sendMail({
           from: `"EC App" <${process.env.AUTH_USER}>`,
           to: email,
           subject: "EC App - Mã xác thực đăng nhập",
