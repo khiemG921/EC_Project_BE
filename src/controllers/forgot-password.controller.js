@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const codeStore = new Map(); // { email: { code, expires, verified, token } }
-const transporter = require('../config/nodemailer');
+const mailer = require('../config/mailer');
 const admin = require("../config/firebase");
 
 // Gửi mã xác thực về email
@@ -13,9 +13,9 @@ async function sendResetCode(req, res) {
   const expires = Date.now() + 120 * 1000; // 2 phút
   codeStore.set(email, { code, expires, verified: false });
   console.log(`[ForgotPassword] Generated code: ${code}, expires at: ${new Date(expires).toISOString()}`);
-  console.log('[ForgotPassword] Transporter config:', transporter.options || transporter);
+  console.log('[ForgotPassword] Sending reset code to:', email);
   try {
-    const info = await transporter.sendMail({
+    const info = await mailer.sendMail({
       from: `"EC App" <${process.env.AUTH_USER}>`,
       to: email,
       subject: 'EC App - Mã xác thực đặt lại mật khẩu',
